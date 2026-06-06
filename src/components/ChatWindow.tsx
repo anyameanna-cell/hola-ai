@@ -96,7 +96,8 @@ export function ChatWindow({ threadId }: ChatWindowProps) {
           thread_id: threadId,
           user_id: user.id,
           role: m.role as "user" | "assistant" | "system",
-          parts: m.parts as unknown as object,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          parts: m.parts as any,
         });
         if (!error) persistedIds.current.add(m.id);
       }
