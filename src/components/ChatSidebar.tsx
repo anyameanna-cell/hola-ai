@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Plus, Trash2, LogOut, MessageSquare } from "lucide-react";
+import { Plus, Trash2, LogOut, MessageSquare, Pencil, Check, X, Ghost } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -16,7 +16,9 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { HolaLogo } from "@/components/HolaLogo";
+import { SettingsButton } from "@/components/SettingsDialog";
 import { toast } from "sonner";
 
 interface Thread {
@@ -44,6 +46,9 @@ export function ChatSidebar() {
   const params = useParams({ strict: false }) as { threadId?: string };
   const activeId = params.threadId;
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -60,11 +65,24 @@ export function ChatSidebar() {
   useEffect(() => {
     load();
     if (!user) return;
+    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle().then(({ data }) => {
+      setDisplayName(data?.display_name ?? null);
+    });
     const channel = supabase
       .channel("threads-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "threads", filter: `user_id=eq.${user.id}` }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const profileChannel = supabase
+      .channel("profile-self")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, (p) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDisplayName((p.new as any)?.display_name ?? null);
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(profileChannel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -73,6 +91,19 @@ export function ChatSidebar() {
     if (error) { toast.error("Could not delete"); return; }
     if (activeId === id) navigate({ to: "/chat" });
     toast.success("Conversation deleted");
+  };
+
+  const startEdit = (t: Thread) => {
+    setEditingId(t.id);
+    setEditValue(t.title);
+  };
+
+  const saveEdit = async (id: string) => {
+    const title = editValue.trim().slice(0, 80);
+    if (!title) { setEditingId(null); return; }
+    const { error } = await supabase.from("threads").update({ title }).eq("id", id);
+    if (error) toast.error("Could not rename");
+    setEditingId(null);
   };
 
   const grouped: Record<string, Thread[]> = {};
@@ -88,9 +119,14 @@ export function ChatSidebar() {
           <HolaLogo size={28} />
           <div className="font-semibold tracking-tight">Hola</div>
         </div>
-        <Button asChild className="bg-brand-gradient text-white border-0 shadow-brand mt-2 mx-1">
-          <Link to="/chat"><Plus className="h-4 w-4 mr-1" /> New chat</Link>
-        </Button>
+        <div className="grid grid-cols-[1fr_auto] gap-1 mx-1 mt-2">
+          <Button asChild className="bg-brand-gradient text-white border-0 shadow-brand">
+            <Link to="/chat"><Plus className="h-4 w-4 mr-1" /> New chat</Link>
+          </Button>
+          <Button asChild variant="outline" size="icon" title="Temporary chat (nothing saved)">
+            <Link to="/chat" search={{ temp: "1" }}><Ghost className="h-4 w-4" /></Link>
+          </Button>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         {BUCKETS.map((b) => {
@@ -103,21 +139,49 @@ export function ChatSidebar() {
                 <SidebarMenu>
                   {items.map((t) => (
                     <SidebarMenuItem key={t.id}>
-                      <div className="group flex items-center gap-1 pr-1">
-                        <SidebarMenuButton asChild isActive={activeId === t.id} className="flex-1">
-                          <Link to="/c/$threadId" params={{ threadId: t.id }}>
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="truncate">{t.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                        <button
-                          aria-label="Delete"
-                          onClick={() => handleDelete(t.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      {editingId === t.id ? (
+                        <div className="flex items-center gap-1 px-1 py-0.5">
+                          <Input
+                            autoFocus
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveEdit(t.id);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            className="h-7 text-sm"
+                          />
+                          <button onClick={() => saveEdit(t.id)} className="p-1 rounded hover:bg-accent" aria-label="Save">
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-accent" aria-label="Cancel">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="group flex items-center gap-1 pr-1">
+                          <SidebarMenuButton asChild isActive={activeId === t.id} className="flex-1">
+                            <Link to="/c/$threadId" params={{ threadId: t.id }}>
+                              <MessageSquare className="h-4 w-4" />
+                              <span className="truncate">{t.title}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                          <button
+                            aria-label="Rename"
+                            onClick={() => startEdit(t)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-accent text-muted-foreground transition"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            aria-label="Delete"
+                            onClick={() => handleDelete(t.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -132,11 +196,12 @@ export function ChatSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter className="border-t">
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">{user?.user_metadata?.full_name ?? user?.email}</div>
+            <div className="text-sm font-medium truncate">{displayName ?? user?.user_metadata?.full_name ?? user?.email}</div>
             <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
           </div>
+          <SettingsButton />
           <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>

@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { ArrowUp, Square, Sparkles } from "lucide-react";
+import { ArrowUp, Square, Sparkles, Ghost } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { HolaLogo } from "@/components/HolaLogo";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { generateThreadTitle } from "@/lib/title.functions";
 import { toast } from "sonner";
 
 interface ChatWindowProps {
-  threadId: string | null;
+  threadId: string;
+  temporary?: boolean;
 }
 
 interface DbMessage {
@@ -36,22 +37,28 @@ function partsToText(parts: UIMessage["parts"]): string {
   return parts.map((p) => (p.type === "text" ? p.text : "")).join("");
 }
 
-export function ChatWindow({ threadId }: ChatWindowProps) {
+export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null);
-  const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const persistedIds = useRef<Set<string>>(new Set());
+  const [threadExists, setThreadExists] = useState(false);
+  const [titleAlreadySet, setTitleAlreadySet] = useState(false);
 
   useEffect(() => {
-    persistedIds.current = new Set();
-    if (!threadId) {
+    setInitialMessages(null);
+    setThreadExists(false);
+    setTitleAlreadySet(false);
+    if (temporary || !user) {
       setInitialMessages([]);
       return;
     }
     let cancelled = false;
     (async () => {
+      const { data: t } = await supabase.from("threads").select("id, title").eq("id", threadId).maybeSingle();
+      if (cancelled) return;
+      if (t) {
+        setThreadExists(true);
+        if (t.title && t.title !== "New chat") setTitleAlreadySet(true);
+      }
       const { data, error } = await supabase
         .from("messages")
         .select("id, role, parts, created_at")
@@ -63,34 +70,84 @@ export function ChatWindow({ threadId }: ChatWindowProps) {
         setInitialMessages([]);
         return;
       }
-      const ui = rowsToUIMessages((data ?? []) as DbMessage[]);
-      ui.forEach((m) => persistedIds.current.add(m.id));
-      setInitialMessages(ui);
+      setInitialMessages(rowsToUIMessages((data ?? []) as DbMessage[]));
     })();
     return () => { cancelled = true; };
-  }, [threadId]);
+  }, [threadId, temporary, user]);
+
+  if (initialMessages === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <HolaLogo size={48} className="opacity-60 animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <ChatWindowInner
+      threadId={threadId}
+      temporary={temporary}
+      initialMessages={initialMessages}
+      initialThreadExists={threadExists}
+      initialTitleAlreadySet={titleAlreadySet}
+    />
+  );
+}
+
+function ChatWindowInner({
+  threadId,
+  temporary,
+  initialMessages,
+  initialThreadExists,
+  initialTitleAlreadySet,
+}: {
+  threadId: string;
+  temporary: boolean;
+  initialMessages: UIMessage[];
+  initialThreadExists: boolean;
+  initialTitleAlreadySet: boolean;
+}) {
+  const { user } = useAuth();
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
+  const threadCreated = useRef(initialThreadExists);
+  const titleGenerated = useRef(initialTitleAlreadySet);
+  const makeTitle = useServerFn(generateThreadTitle);
 
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
 
   const { messages, sendMessage, status, stop } = useChat({
-    id: threadId ?? "new",
-    messages: initialMessages ?? [],
+    id: threadId,
+    messages: initialMessages,
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
 
-  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status]);
 
-  // Persist new messages (user + assistant) as they finalize
   useEffect(() => {
-    if (!threadId || !user) return;
+    if (temporary || !user) return;
     if (status === "streaming" || status === "submitted") return;
     const toSave = messages.filter((m) => !persistedIds.current.has(m.id));
     if (toSave.length === 0) return;
+
     (async () => {
+      if (!threadCreated.current) {
+        const firstUser = messages.find((m) => m.role === "user");
+        const fallback = firstUser ? partsToText(firstUser.parts).slice(0, 60) : "New chat";
+        const { error } = await supabase
+          .from("threads")
+          .insert({ id: threadId, user_id: user.id, title: fallback });
+        if (error && !error.message.toLowerCase().includes("duplicate")) {
+          toast.error("Could not save conversation");
+          return;
+        }
+        threadCreated.current = true;
+      }
+
       for (const m of toSave) {
         const { error } = await supabase.from("messages").insert({
           thread_id: threadId,
@@ -101,51 +158,51 @@ export function ChatWindow({ threadId }: ChatWindowProps) {
         });
         if (!error) persistedIds.current.add(m.id);
       }
-      // bump thread updated_at
       await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+
+      if (!titleGenerated.current && messages.length >= 2) {
+        const fu = messages.find((m) => m.role === "user");
+        const fa = messages.find((m) => m.role === "assistant");
+        if (fu && fa) {
+          titleGenerated.current = true;
+          try {
+            const res = await makeTitle({
+              data: {
+                userMessage: partsToText(fu.parts),
+                assistantMessage: partsToText(fa.parts),
+              },
+            });
+            if (res?.title) {
+              await supabase.from("threads").update({ title: res.title }).eq("id", threadId);
+            }
+          } catch { /* non-fatal */ }
+        }
+      }
     })();
-  }, [messages, status, threadId, user]);
+  }, [messages, status, threadId, user, temporary, makeTitle]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || status === "streaming" || status === "submitted") return;
     if (!user) return;
-
-    let id = threadId;
-    // Create thread on first message
-    if (!id) {
-      const title = text.slice(0, 60);
-      const { data, error } = await supabase
-        .from("threads")
-        .insert({ user_id: user.id, title })
-        .select("id")
-        .single();
-      if (error || !data) {
-        toast.error("Could not start conversation");
-        return;
-      }
-      id = data.id;
-      setInput("");
-      // Navigate then send via the new chat instance — simpler: send first then navigate
-      // We'll send below before navigating; the new route will load these from DB.
-      await sendMessage({ text });
-      navigate({ to: "/c/$threadId", params: { threadId: id } });
-      return;
-    }
-
     setInput("");
     await sendMessage({ text });
   };
 
   const isBusy = status === "streaming" || status === "submitted";
-  const showEmpty = (initialMessages?.length ?? 0) === 0 && messages.length === 0;
+  const showEmpty = messages.length === 0;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {temporary && (
+        <div className="border-b bg-muted/40 px-4 py-2 text-xs flex items-center gap-2 justify-center text-muted-foreground">
+          <Ghost className="h-3.5 w-3.5" /> Temporary chat — nothing is saved.
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {showEmpty ? (
-          <EmptyState onPick={(t) => setInput(t)} />
+          <EmptyState onPick={(t) => setInput(t)} temporary={temporary} />
         ) : (
           <div className="mx-auto max-w-3xl w-full px-4 py-6 space-y-6">
             <AnimatePresence initial={false}>
@@ -170,7 +227,7 @@ export function ChatWindow({ threadId }: ChatWindowProps) {
                   handleSubmit(e as unknown as FormEvent);
                 }
               }}
-              placeholder="Message Hola..."
+              placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
               className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pr-14 focus-visible:ring-0 shadow-none"
               autoFocus
@@ -190,6 +247,7 @@ export function ChatWindow({ threadId }: ChatWindowProps) {
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Hola can make mistakes. Verify important info.
           </p>
+
         </form>
       </div>
     </div>
@@ -212,8 +270,8 @@ function MessageBubble({ message, streaming }: { message: UIMessage; streaming: 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
-      <div className={`flex-1 prose-chat text-foreground ${streaming ? "streaming-caret" : ""}`}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <div className={`flex-1 min-w-0 ${streaming ? "streaming-caret" : ""}`}>
+        <MarkdownContent>{text}</MarkdownContent>
       </div>
     </motion.div>
   );
@@ -234,12 +292,12 @@ function ThinkingBubble() {
 
 const SUGGESTIONS = [
   "Explain quantum entanglement like I'm 12",
-  "Draft a heartfelt thank-you email to my mentor",
+  "Draw a mermaid flowchart of a login flow",
   "Summarize the pros and cons of remote work",
   "Help me plan a 3-day trip to Lisbon",
 ];
 
-function EmptyState({ onPick }: { onPick: (t: string) => void }) {
+function EmptyState({ onPick, temporary }: { onPick: (t: string) => void; temporary: boolean }) {
   return (
     <div className="h-full min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
       <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
@@ -249,7 +307,7 @@ function EmptyState({ onPick }: { onPick: (t: string) => void }) {
         Hola, <span className="text-brand-gradient">how can I help?</span>
       </h1>
       <p className="mt-2 text-muted-foreground flex items-center gap-1.5">
-        <Sparkles className="h-4 w-4" /> Ask anything, or try a prompt below.
+        {temporary ? <><Ghost className="h-4 w-4" /> Temporary chat — nothing is saved.</> : <><Sparkles className="h-4 w-4" /> Ask anything, or try a prompt below.</>}
       </p>
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-2xl">
         {SUGGESTIONS.map((s) => (
