@@ -40,29 +40,24 @@ function partsToText(parts: UIMessage["parts"]): string {
 export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   const { user } = useAuth();
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null);
-  const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const persistedIds = useRef<Set<string>>(new Set());
-  const threadCreated = useRef(false);
-  const titleGenerated = useRef(false);
-  const makeTitle = useServerFn(generateThreadTitle);
+  const [threadExists, setThreadExists] = useState(false);
+  const [titleAlreadySet, setTitleAlreadySet] = useState(false);
 
-  // Load existing messages (only when not temporary)
   useEffect(() => {
-    persistedIds.current = new Set();
-    threadCreated.current = false;
-    titleGenerated.current = false;
+    setInitialMessages(null);
+    setThreadExists(false);
+    setTitleAlreadySet(false);
     if (temporary || !user) {
       setInitialMessages([]);
       return;
     }
     let cancelled = false;
     (async () => {
-      // Check if thread exists
       const { data: t } = await supabase.from("threads").select("id, title").eq("id", threadId).maybeSingle();
+      if (cancelled) return;
       if (t) {
-        threadCreated.current = true;
-        if (t.title && t.title !== "New chat") titleGenerated.current = true;
+        setThreadExists(true);
+        if (t.title && t.title !== "New chat") setTitleAlreadySet(true);
       }
       const { data, error } = await supabase
         .from("messages")
@@ -75,43 +70,78 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
         setInitialMessages([]);
         return;
       }
-      const ui = rowsToUIMessages((data ?? []) as DbMessage[]);
-      ui.forEach((m) => persistedIds.current.add(m.id));
-      setInitialMessages(ui);
+      setInitialMessages(rowsToUIMessages((data ?? []) as DbMessage[]));
     })();
     return () => { cancelled = true; };
   }, [threadId, temporary, user]);
+
+  if (initialMessages === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <HolaLogo size={48} className="opacity-60 animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <ChatWindowInner
+      threadId={threadId}
+      temporary={temporary}
+      initialMessages={initialMessages}
+      initialThreadExists={threadExists}
+      initialTitleAlreadySet={titleAlreadySet}
+    />
+  );
+}
+
+function ChatWindowInner({
+  threadId,
+  temporary,
+  initialMessages,
+  initialThreadExists,
+  initialTitleAlreadySet,
+}: {
+  threadId: string;
+  temporary: boolean;
+  initialMessages: UIMessage[];
+  initialThreadExists: boolean;
+  initialTitleAlreadySet: boolean;
+}) {
+  const { user } = useAuth();
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
+  const threadCreated = useRef(initialThreadExists);
+  const titleGenerated = useRef(initialTitleAlreadySet);
+  const makeTitle = useServerFn(generateThreadTitle);
 
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
 
   const { messages, sendMessage, status, stop } = useChat({
     id: threadId,
-    messages: initialMessages ?? [],
+    messages: initialMessages,
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
 
-  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status]);
 
-  // Persist finalized messages
   useEffect(() => {
-    if (temporary || !user || initialMessages === null) return;
+    if (temporary || !user) return;
     if (status === "streaming" || status === "submitted") return;
     const toSave = messages.filter((m) => !persistedIds.current.has(m.id));
     if (toSave.length === 0) return;
 
     (async () => {
-      // Ensure thread row exists (lazy create on first save)
       if (!threadCreated.current) {
-        const firstUserText = messages.find((m) => m.role === "user");
-        const fallback = firstUserText ? partsToText(firstUserText.parts).slice(0, 60) : "New chat";
+        const firstUser = messages.find((m) => m.role === "user");
+        const fallback = firstUser ? partsToText(firstUser.parts).slice(0, 60) : "New chat";
         const { error } = await supabase
           .from("threads")
           .insert({ id: threadId, user_id: user.id, title: fallback });
-        if (error && !error.message.includes("duplicate")) {
+        if (error && !error.message.toLowerCase().includes("duplicate")) {
           toast.error("Could not save conversation");
           return;
         }
@@ -130,17 +160,16 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
       }
       await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
 
-      // Auto-generate title after first exchange
       if (!titleGenerated.current && messages.length >= 2) {
-        const firstUser = messages.find((m) => m.role === "user");
-        const firstAssistant = messages.find((m) => m.role === "assistant");
-        if (firstUser && firstAssistant) {
+        const fu = messages.find((m) => m.role === "user");
+        const fa = messages.find((m) => m.role === "assistant");
+        if (fu && fa) {
           titleGenerated.current = true;
           try {
             const res = await makeTitle({
               data: {
-                userMessage: partsToText(firstUser.parts),
-                assistantMessage: partsToText(firstAssistant.parts),
+                userMessage: partsToText(fu.parts),
+                assistantMessage: partsToText(fa.parts),
               },
             });
             if (res?.title) {
@@ -150,7 +179,7 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
         }
       }
     })();
-  }, [messages, status, threadId, user, temporary, initialMessages, makeTitle]);
+  }, [messages, status, threadId, user, temporary, makeTitle]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -162,7 +191,7 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   };
 
   const isBusy = status === "streaming" || status === "submitted";
-  const showEmpty = (initialMessages?.length ?? 0) === 0 && messages.length === 0;
+  const showEmpty = messages.length === 0;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -218,6 +247,7 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Hola can make mistakes. Verify important info.
           </p>
+
         </form>
       </div>
     </div>
