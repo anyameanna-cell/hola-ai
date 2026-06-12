@@ -1,9 +1,10 @@
-import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Outlet, Link } from "@tanstack/react-router";
+import { Ghost, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { HolaLogo } from "@/components/HolaLogo";
-import { SettingsButton } from "@/components/SettingsDialog";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -33,7 +34,16 @@ function AppLayout() {
                 <span className="font-semibold tracking-tight">Hola</span>
               </div>
             </div>
-            <SettingsButton />
+            <div className="flex items-center gap-1">
+              <Button asChild variant="ghost" size="sm" title="Temporary chat (nothing saved)">
+                <Link to="/chat" search={{ temp: "1" }}>
+                  <Ghost className="h-4 w-4 mr-1" /> Temporary
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="bg-brand-gradient text-white border-0 shadow-brand">
+                <Link to="/chat"><Plus className="h-4 w-4 mr-1" /> New</Link>
+              </Button>
+            </div>
           </header>
           <main className="flex-1 flex flex-col min-h-0">
             <Outlet />
