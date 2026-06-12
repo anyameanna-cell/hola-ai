@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Settings, Sun, Moon } from "lucide-react";
 import {
   Dialog,
@@ -10,8 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useTheme, type ThemeName, type FontFamily, type FontSize } from "@/components/ThemeProvider";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const THEMES: { id: ThemeName; label: string; gradient: string }[] = [
   { id: "default", label: "Default", gradient: "linear-gradient(135deg, oklch(0.68 0.25 350), oklch(0.55 0.27 295))" },
@@ -39,7 +43,7 @@ export function SettingsButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Settings">
-          <Settings className="h-5 w-5" />
+          <Settings className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <SettingsContent />
@@ -49,15 +53,66 @@ export function SettingsButton() {
 
 function SettingsContent() {
   const { theme, mode, fontFamily, fontSize, setTheme, setMode, setFontFamily, setFontSize } = useTheme();
+  const { user } = useAuth();
+  const [name, setName] = useState("");
+  const [savedName, setSavedName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const n = data?.display_name ?? user.user_metadata?.full_name ?? "";
+        setName(n);
+        setSavedName(n);
+      });
+  }, [user]);
+
+  const saveName = async () => {
+    if (!user) return;
+    const trimmed = name.trim().slice(0, 60);
+    if (!trimmed || trimmed === savedName) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: trimmed })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) toast.error("Could not save name");
+    else {
+      setSavedName(trimmed);
+      toast.success("Name updated");
+    }
+  };
 
   return (
-    <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Appearance</DialogTitle>
-        <DialogDescription>Customize how Hola looks and feels.</DialogDescription>
+        <DialogTitle>Settings</DialogTitle>
+        <DialogDescription>Profile and appearance.</DialogDescription>
       </DialogHeader>
 
       <div className="space-y-5 mt-2">
+        <section className="space-y-2">
+          <Label htmlFor="display-name">Display name</Label>
+          <div className="flex gap-2">
+            <Input
+              id="display-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              maxLength={60}
+            />
+            <Button onClick={saveName} disabled={saving || name.trim() === savedName || !name.trim()}>
+              Save
+            </Button>
+          </div>
+        </section>
+
         <section className="space-y-2">
           <Label>Color theme</Label>
           <div className="grid grid-cols-4 gap-2">
