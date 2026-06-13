@@ -6,6 +6,7 @@ import { ArrowUp, Square, Sparkles, Ghost } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,14 +109,47 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
+  const { theme, mode, fontFamily, fontSize } = useTheme();
   const [input, setInput] = useState("");
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [recentChats, setRecentChats] = useState<{ title: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  // Load profile name + recent thread titles for cross-conversation memory
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
+      .then(({ data }) => setDisplayName(data?.display_name ?? null));
+    supabase.from("threads").select("title").eq("user_id", user.id)
+      .order("updated_at", { ascending: false }).limit(8)
+      .then(({ data }) => setRecentChats((data ?? []) as { title: string }[]));
+  }, [user, threadId]);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ messages, id, body }) => ({
+          body: {
+            id,
+            messages,
+            ...body,
+            context: {
+              displayName: displayName ?? user?.user_metadata?.full_name ?? null,
+              email: user?.email,
+              theme, mode, fontFamily, fontSize,
+              temporary,
+              recentChats,
+            },
+          },
+        }),
+      }),
+    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats],
+  );
 
   const { messages, sendMessage, status, stop } = useChat({
     id: threadId,
@@ -123,6 +157,7 @@ function ChatWindowInner({
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -159,6 +194,8 @@ function ChatWindowInner({
         if (!error) persistedIds.current.add(m.id);
       }
       await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+      window.dispatchEvent(new CustomEvent("hola:threads-changed"));
+
 
       if (!titleGenerated.current && messages.length >= 2) {
         const fu = messages.find((m) => m.role === "user");
@@ -174,6 +211,7 @@ function ChatWindowInner({
             });
             if (res?.title) {
               await supabase.from("threads").update({ title: res.title }).eq("id", threadId);
+              window.dispatchEvent(new CustomEvent("hola:threads-changed"));
             }
           } catch { /* non-fatal */ }
         }

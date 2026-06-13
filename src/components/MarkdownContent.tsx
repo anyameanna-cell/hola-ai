@@ -1,44 +1,67 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy } from "lucide-react";
 import mermaid from "mermaid";
 
+// Init mermaid exactly once for the page
 let mermaidInit = false;
-function ensureMermaid(dark: boolean) {
-  if (!mermaidInit) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: dark ? "dark" : "default",
-      securityLevel: "loose",
-      fontFamily: "inherit",
-    });
-    mermaidInit = true;
-  }
+function ensureMermaid() {
+  if (mermaidInit) return;
+  const dark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: dark ? "dark" : "default",
+    securityLevel: "loose",
+    fontFamily: "inherit",
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+  });
+  mermaidInit = true;
 }
 
-function MermaidBlock({ code }: { code: string }) {
+// Add native <title> tooltips to every node so hovering shows the label
+function enrichTooltips(host: HTMLElement) {
+  host.querySelectorAll<SVGGElement>("g.node").forEach((node) => {
+    if (node.querySelector(":scope > title")) return;
+    const label = node.querySelector(".nodeLabel")?.textContent?.trim();
+    const id = node.getAttribute("id") ?? "";
+    const text = label || id;
+    if (!text) return;
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    t.textContent = text;
+    node.insertBefore(t, node.firstChild);
+  });
+  host.querySelectorAll<SVGGElement>("g.edgeLabel").forEach((edge) => {
+    const text = edge.textContent?.trim();
+    if (!text || edge.querySelector(":scope > title")) return;
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    t.textContent = text;
+    edge.appendChild(t);
+  });
+}
+
+const MermaidBlock = memo(function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
-  const id = useRef(`mmd-${Math.random().toString(36).slice(2, 9)}`);
+  // Stable id per code string so re-renders don't re-render mermaid
+  const id = useMemo(() => `mmd-${Math.abs(hash(code))}`, [code]);
 
   useEffect(() => {
-    const dark = document.documentElement.classList.contains("dark");
-    ensureMermaid(dark);
+    ensureMermaid();
     let cancelled = false;
     (async () => {
       try {
-        const { svg } = await mermaid.render(id.current, code);
-        if (!cancelled && ref.current) {
-          ref.current.innerHTML = svg;
-          setErr(null);
-        }
+        const { svg } = await mermaid.render(id, code);
+        if (cancelled || !ref.current) return;
+        ref.current.innerHTML = svg;
+        enrichTooltips(ref.current);
+        setErr(null);
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : "Diagram error");
       }
     })();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, id]);
 
   if (err) {
     return (
@@ -48,10 +71,16 @@ function MermaidBlock({ code }: { code: string }) {
       </pre>
     );
   }
-  return <div ref={ref} className="my-3 rounded-lg border bg-card p-3 overflow-auto flex justify-center" />;
+  return <div ref={ref} className="mermaid-host my-3 rounded-lg border bg-card p-3 overflow-auto flex justify-center" />;
+});
+
+function hash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
 }
 
-function CodeBlock({ language, code }: { language: string; code: string }) {
+const CodeBlock = memo(function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
     try {
@@ -82,7 +111,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
       </pre>
     </div>
   );
-}
+});
 
 export function MarkdownContent({ children }: { children: string }) {
   return (
