@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS ai_can_rename boolean NOT NULL DEFAULT true;
