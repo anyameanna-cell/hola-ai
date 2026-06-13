@@ -194,6 +194,8 @@ function ChatWindowInner({
         if (!error) persistedIds.current.add(m.id);
       }
       await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+      window.dispatchEvent(new CustomEvent("hola:threads-changed"));
+
 
       if (!titleGenerated.current && messages.length >= 2) {
         const fu = messages.find((m) => m.role === "user");
