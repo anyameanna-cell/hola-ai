@@ -109,14 +109,47 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
+  const { theme, mode, fontFamily, fontSize } = useTheme();
   const [input, setInput] = useState("");
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [recentChats, setRecentChats] = useState<{ title: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  // Load profile name + recent thread titles for cross-conversation memory
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
+      .then(({ data }) => setDisplayName(data?.display_name ?? null));
+    supabase.from("threads").select("title").eq("user_id", user.id)
+      .order("updated_at", { ascending: false }).limit(8)
+      .then(({ data }) => setRecentChats((data ?? []).filter((t) => t.id !== threadId || true) as { title: string }[]));
+  }, [user, threadId]);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ messages, id, body }) => ({
+          body: {
+            id,
+            messages,
+            ...body,
+            context: {
+              displayName: displayName ?? user?.user_metadata?.full_name ?? null,
+              email: user?.email,
+              theme, mode, fontFamily, fontSize,
+              temporary,
+              recentChats,
+            },
+          },
+        }),
+      }),
+    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats],
+  );
 
   const { messages, sendMessage, status, stop } = useChat({
     id: threadId,
@@ -124,6 +157,7 @@ function ChatWindowInner({
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
