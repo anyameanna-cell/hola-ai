@@ -51,6 +51,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_can_rename: boolean
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -62,6 +63,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_can_rename?: boolean
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -73,6 +75,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_can_rename?: boolean
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
