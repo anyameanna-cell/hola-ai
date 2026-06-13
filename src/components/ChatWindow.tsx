@@ -211,6 +211,7 @@ function ChatWindowInner({
             });
             if (res?.title) {
               await supabase.from("threads").update({ title: res.title }).eq("id", threadId);
+              window.dispatchEvent(new CustomEvent("hola:threads-changed"));
             }
           } catch { /* non-fatal */ }
         }
