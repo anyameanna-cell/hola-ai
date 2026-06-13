@@ -126,7 +126,7 @@ function ChatWindowInner({
       .then(({ data }) => setDisplayName(data?.display_name ?? null));
     supabase.from("threads").select("title").eq("user_id", user.id)
       .order("updated_at", { ascending: false }).limit(8)
-      .then(({ data }) => setRecentChats((data ?? []).filter((t) => t.id !== threadId || true) as { title: string }[]));
+      .then(({ data }) => setRecentChats((data ?? []) as { title: string }[]));
   }, [user, threadId]);
 
   const transport = useMemo(
