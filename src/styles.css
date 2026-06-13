@@ -299,14 +299,30 @@
 :root[data-font-size="xlarge"] { font-size: 20px; }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body { font-family: var(--app-font); }
-  body {
+  * {
+    border-color: var(--color-border);
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    font-family: var(--app-font);
     background-color: var(--color-background);
+  }
+  body {
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
   }
+  /* Kill the white click flash from default browser tap highlight & button focus rings */
+  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+  button:focus, a:focus { outline: none; }
 }
+
+/* Mermaid diagram polish */
+.mermaid-host svg { max-width: 100%; height: auto; }
+.mermaid-host .node:hover rect,
+.mermaid-host .node:hover circle,
+.mermaid-host .node:hover polygon,
+.mermaid-host .node:hover path { filter: brightness(1.08); cursor: help; }
+
 
 /* Brand utilities */
 .bg-brand-gradient { background-image: var(--gradient-brand); }
