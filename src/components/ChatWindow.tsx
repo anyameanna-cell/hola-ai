@@ -109,24 +109,45 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
-  const { theme, mode, fontFamily, fontSize } = useTheme();
+  const { theme, mode, fontFamily, fontSize, aiCanRename } = useTheme();
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [recentChats, setRecentChats] = useState<{ title: string }[]>([]);
+  const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
+  const [generatingImage, setGeneratingImage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
+  const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread titles for cross-conversation memory
+  // Load profile name + recent thread titles+snippets for long-term memory
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
       .then(({ data }) => setDisplayName(data?.display_name ?? null));
-    supabase.from("threads").select("title").eq("user_id", user.id)
-      .order("updated_at", { ascending: false }).limit(8)
-      .then(({ data }) => setRecentChats((data ?? []) as { title: string }[]));
+    (async () => {
+      const { data: threads } = await supabase
+        .from("threads").select("id, title")
+        .eq("user_id", user.id).neq("id", threadId)
+        .order("updated_at", { ascending: false }).limit(8);
+      if (!threads?.length) { setRecentChats([]); return; }
+      const ids = threads.map((t) => t.id);
+      const { data: msgs } = await supabase
+        .from("messages").select("thread_id, role, parts, created_at")
+        .in("thread_id", ids).eq("role", "user")
+        .order("created_at", { ascending: true });
+      const firstByThread = new Map<string, string>();
+      for (const m of msgs ?? []) {
+        if (firstByThread.has(m.thread_id)) continue;
+        const parts = Array.isArray(m.parts) ? m.parts : [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = parts.map((p: any) => (p?.type === "text" ? p.text : "")).join("").slice(0, 140);
+        firstByThread.set(m.thread_id, text);
+      }
+      setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
+    })();
   }, [user, threadId]);
 
   const transport = useMemo(
