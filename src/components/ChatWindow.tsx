@@ -303,7 +303,6 @@ function ChatWindowInner({
     await sendMessage({ text });
   };
 
-  const isBusy = status === "streaming" || status === "submitted";
   const showEmpty = messages.length === 0;
 
   return (
