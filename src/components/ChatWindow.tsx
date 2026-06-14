@@ -218,16 +218,23 @@ function ChatWindowInner({
       window.dispatchEvent(new CustomEvent("hola:threads-changed"));
 
 
-      if (!titleGenerated.current && messages.length >= 2) {
+      const userCount = messages.filter((m) => m.role === "user").length;
+      const shouldRetitle =
+        (!titleGenerated.current && messages.length >= 2) ||
+        (aiCanRename && titleGenerated.current && userCount >= 4 && userCount - lastRetitledAt.current >= 4);
+
+      if (shouldRetitle) {
         const fu = messages.find((m) => m.role === "user");
-        const fa = messages.find((m) => m.role === "assistant");
-        if (fu && fa) {
+        const lu = [...messages].reverse().find((m) => m.role === "user");
+        const la = [...messages].reverse().find((m) => m.role === "assistant");
+        if (fu && la) {
           titleGenerated.current = true;
+          lastRetitledAt.current = userCount;
           try {
             const res = await makeTitle({
               data: {
-                userMessage: partsToText(fu.parts),
-                assistantMessage: partsToText(fa.parts),
+                userMessage: partsToText((lu ?? fu).parts),
+                assistantMessage: partsToText(la.parts),
               },
             });
             if (res?.title) {
@@ -238,7 +245,52 @@ function ChatWindowInner({
         }
       }
     })();
-  }, [messages, status, threadId, user, temporary, makeTitle]);
+  }, [messages, status, threadId, user, temporary, makeTitle, aiCanRename]);
+
+  // Auto-resize textarea so input bar grows smoothly instead of jumping
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
+  }, [input]);
+
+  const handleGenerateImage = async () => {
+    const prompt = input.trim();
+    if (!prompt || generatingImage || isBusy || !user) return;
+    setInput("");
+    setGeneratingImage(true);
+    try {
+      // Send the user's prompt as a normal user message first (so it appears in chat)
+      await sendMessage({ text: `🎨 Generate image: ${prompt}` });
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url } = (await res.json()) as { url: string };
+      // Persist assistant image message directly to DB and refresh
+      if (!temporary) {
+        if (!threadCreated.current) {
+          await supabase.from("threads").insert({ id: threadId, user_id: user.id, title: prompt.slice(0, 40) });
+          threadCreated.current = true;
+        }
+        await supabase.from("messages").insert({
+          thread_id: threadId,
+          user_id: user.id,
+          role: "assistant",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          parts: [{ type: "text", text: `![generated image](${url})` }] as any,
+        });
+        window.location.reload();
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Image generation failed");
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
