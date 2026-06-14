@@ -18,8 +18,8 @@ export const generateThreadTitle = createServerFn({ method: "POST" })
     const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
       system:
-        "Generate a 3-6 word title summarizing the conversation. Output ONLY the title text — no quotes, no punctuation at the end, no prefix like 'Title:'.",
+        "Create a SHORT 2-4 word title for this conversation. Use simple, everyday words a child would understand. No jargon, no fancy vocabulary, no quotes, no punctuation at the end, no 'Title:' prefix. Just the plain title.",
       prompt: `User: ${data.userMessage}\n\nAssistant: ${data.assistantMessage}\n\nTitle:`,
     });
-    return { title: text.trim().replace(/^["']|["']$/g, "").slice(0, 80) || "New chat" };
+    return { title: text.trim().replace(/^["']|["']$/g, "").slice(0, 40) || "New chat" };
   });
