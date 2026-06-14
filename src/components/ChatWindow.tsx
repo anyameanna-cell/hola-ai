@@ -172,12 +172,14 @@ function ChatWindowInner({
     [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats],
   );
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, setMessages } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
+
+  const isBusy = status === "streaming" || status === "submitted";
 
 
   useEffect(() => {
