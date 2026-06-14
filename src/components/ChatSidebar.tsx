@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Plus, Trash2, LogOut, MessageSquare, Pencil, Check, X, Ghost, ChevronRight } from "lucide-react";
+import { Plus, Trash2, LogOut, MessageSquare, Pencil, Check, X, Ghost, ChevronRight, PanelLeftClose } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
