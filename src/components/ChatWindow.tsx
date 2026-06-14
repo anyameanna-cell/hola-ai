@@ -343,6 +343,7 @@ function ChatWindowInner({
         <form onSubmit={handleSubmit} className="mx-auto max-w-3xl w-full px-4 py-3">
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition">
             <Textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -353,9 +354,22 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pr-14 focus-visible:ring-0 shadow-none"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-12 pr-14 focus-visible:ring-0 shadow-none overflow-hidden"
               autoFocus
             />
+            <div className="absolute left-2 bottom-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title="Generate image from prompt"
+                disabled={!input.trim() || generatingImage || isBusy}
+                onClick={handleGenerateImage}
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                {generatingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+              </Button>
+            </div>
             <div className="absolute right-2 bottom-2">
               {isBusy ? (
                 <Button type="button" size="icon" onClick={() => stop()} className="rounded-full bg-foreground text-background hover:opacity-90 h-9 w-9">
