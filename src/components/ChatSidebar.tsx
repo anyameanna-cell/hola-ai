@@ -134,7 +134,10 @@ export function ChatSidebar() {
       <SidebarHeader className="border-b">
         <div className="flex items-center gap-2 px-2 py-1.5">
           <HolaLogo size={28} />
-          <div className="font-semibold tracking-tight">Hola</div>
+          <div className="font-semibold tracking-tight flex-1">Hola</div>
+          <Button variant="ghost" size="icon" onClick={closeSidebar} aria-label="Close menu" className="h-7 w-7">
+            <PanelLeftClose className="h-4 w-4" />
+          </Button>
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-1 mx-1 mt-2">
           <Button asChild className="bg-brand-gradient text-white border-0 shadow-brand">
