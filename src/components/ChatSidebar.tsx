@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Plus, Trash2, LogOut, MessageSquare, Pencil, Check, X, Ghost, ChevronRight } from "lucide-react";
+import { Plus, Trash2, LogOut, MessageSquare, Pencil, Check, X, Ghost, ChevronRight, PanelLeftClose } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,8 @@ export function ChatSidebar() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { threadId?: string };
   const activeId = params.threadId;
+  const { toggleSidebar, isMobile, setOpenMobile } = useSidebar();
+  const closeSidebar = () => { if (isMobile) setOpenMobile(false); else toggleSidebar(); };
   const [threads, setThreads] = useState<Thread[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -131,7 +134,10 @@ export function ChatSidebar() {
       <SidebarHeader className="border-b">
         <div className="flex items-center gap-2 px-2 py-1.5">
           <HolaLogo size={28} />
-          <div className="font-semibold tracking-tight">Hola</div>
+          <div className="font-semibold tracking-tight flex-1">Hola</div>
+          <Button variant="ghost" size="icon" onClick={closeSidebar} aria-label="Close menu" className="h-7 w-7">
+            <PanelLeftClose className="h-4 w-4" />
+          </Button>
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-1 mx-1 mt-2">
           <Button asChild className="bg-brand-gradient text-white border-0 shadow-brand">

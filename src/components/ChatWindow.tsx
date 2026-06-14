@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Square, Sparkles, Ghost } from "lucide-react";
+import { ArrowUp, Square, Sparkles, Ghost, ImageIcon, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -109,24 +109,45 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
-  const { theme, mode, fontFamily, fontSize } = useTheme();
+  const { theme, mode, fontFamily, fontSize, aiCanRename } = useTheme();
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [recentChats, setRecentChats] = useState<{ title: string }[]>([]);
+  const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
+  const [generatingImage, setGeneratingImage] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
+  const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread titles for cross-conversation memory
+  // Load profile name + recent thread titles+snippets for long-term memory
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
       .then(({ data }) => setDisplayName(data?.display_name ?? null));
-    supabase.from("threads").select("title").eq("user_id", user.id)
-      .order("updated_at", { ascending: false }).limit(8)
-      .then(({ data }) => setRecentChats((data ?? []) as { title: string }[]));
+    (async () => {
+      const { data: threads } = await supabase
+        .from("threads").select("id, title")
+        .eq("user_id", user.id).neq("id", threadId)
+        .order("updated_at", { ascending: false }).limit(8);
+      if (!threads?.length) { setRecentChats([]); return; }
+      const ids = threads.map((t) => t.id);
+      const { data: msgs } = await supabase
+        .from("messages").select("thread_id, role, parts, created_at")
+        .in("thread_id", ids).eq("role", "user")
+        .order("created_at", { ascending: true });
+      const firstByThread = new Map<string, string>();
+      for (const m of msgs ?? []) {
+        if (firstByThread.has(m.thread_id)) continue;
+        const parts = Array.isArray(m.parts) ? m.parts : [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = parts.map((p: any) => (p?.type === "text" ? p.text : "")).join("").slice(0, 140);
+        firstByThread.set(m.thread_id, text);
+      }
+      setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
+    })();
   }, [user, threadId]);
 
   const transport = useMemo(
@@ -151,12 +172,14 @@ function ChatWindowInner({
     [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats],
   );
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, setMessages } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
     onError: (e) => toast.error(e.message ?? "Something went wrong"),
   });
+
+  const isBusy = status === "streaming" || status === "submitted";
 
 
   useEffect(() => {
@@ -197,16 +220,23 @@ function ChatWindowInner({
       window.dispatchEvent(new CustomEvent("hola:threads-changed"));
 
 
-      if (!titleGenerated.current && messages.length >= 2) {
+      const userCount = messages.filter((m) => m.role === "user").length;
+      const shouldRetitle =
+        (!titleGenerated.current && messages.length >= 2) ||
+        (aiCanRename && titleGenerated.current && userCount >= 4 && userCount - lastRetitledAt.current >= 4);
+
+      if (shouldRetitle) {
         const fu = messages.find((m) => m.role === "user");
-        const fa = messages.find((m) => m.role === "assistant");
-        if (fu && fa) {
+        const lu = [...messages].reverse().find((m) => m.role === "user");
+        const la = [...messages].reverse().find((m) => m.role === "assistant");
+        if (fu && la) {
           titleGenerated.current = true;
+          lastRetitledAt.current = userCount;
           try {
             const res = await makeTitle({
               data: {
-                userMessage: partsToText(fu.parts),
-                assistantMessage: partsToText(fa.parts),
+                userMessage: partsToText((lu ?? fu).parts),
+                assistantMessage: partsToText(la.parts),
               },
             });
             if (res?.title) {
@@ -217,7 +247,64 @@ function ChatWindowInner({
         }
       }
     })();
-  }, [messages, status, threadId, user, temporary, makeTitle]);
+  }, [messages, status, threadId, user, temporary, makeTitle, aiCanRename]);
+
+  // Auto-resize textarea so input bar grows smoothly instead of jumping
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
+  }, [input]);
+
+  const handleGenerateImage = async () => {
+    const prompt = input.trim();
+    if (!prompt || generatingImage || isBusy || !user) return;
+    setInput("");
+    setGeneratingImage(true);
+    const userMsgId = crypto.randomUUID();
+    const assistantMsgId = crypto.randomUUID();
+    // Optimistically show the user prompt
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] } as UIMessage,
+    ]);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url } = (await res.json()) as { url: string };
+      const assistantParts = [{ type: "text", text: `![generated image](${url})` }];
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantMsgId, role: "assistant", parts: assistantParts } as UIMessage,
+      ]);
+      // Persist to DB
+      if (!temporary) {
+        if (!threadCreated.current) {
+          await supabase.from("threads").insert({ id: threadId, user_id: user.id, title: prompt.slice(0, 40) });
+          threadCreated.current = true;
+        }
+        await supabase.from("messages").insert([
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { id: userMsgId, thread_id: threadId, user_id: user.id, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] as any },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { id: assistantMsgId, thread_id: threadId, user_id: user.id, role: "assistant", parts: assistantParts as any },
+        ]);
+        persistedIds.current.add(userMsgId);
+        persistedIds.current.add(assistantMsgId);
+        await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+        window.dispatchEvent(new CustomEvent("hola:threads-changed"));
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Image generation failed");
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -228,7 +315,6 @@ function ChatWindowInner({
     await sendMessage({ text });
   };
 
-  const isBusy = status === "streaming" || status === "submitted";
   const showEmpty = messages.length === 0;
 
   return (
@@ -257,6 +343,7 @@ function ChatWindowInner({
         <form onSubmit={handleSubmit} className="mx-auto max-w-3xl w-full px-4 py-3">
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition">
             <Textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -267,9 +354,22 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pr-14 focus-visible:ring-0 shadow-none"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-12 pr-14 focus-visible:ring-0 shadow-none overflow-hidden"
               autoFocus
             />
+            <div className="absolute left-2 bottom-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title="Generate image from prompt"
+                disabled={!input.trim() || generatingImage || isBusy}
+                onClick={handleGenerateImage}
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                {generatingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+              </Button>
+            </div>
             <div className="absolute right-2 bottom-2">
               {isBusy ? (
                 <Button type="button" size="icon" onClick={() => stop()} className="rounded-full bg-foreground text-background hover:opacity-90 h-9 w-9">
