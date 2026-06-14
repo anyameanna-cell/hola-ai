@@ -47,6 +47,8 @@ export function ChatSidebar() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { threadId?: string };
   const activeId = params.threadId;
+  const { toggleSidebar, isMobile, setOpenMobile } = useSidebar();
+  const closeSidebar = () => { if (isMobile) setOpenMobile(false); else toggleSidebar(); };
   const [threads, setThreads] = useState<Thread[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
