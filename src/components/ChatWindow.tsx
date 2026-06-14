@@ -262,9 +262,14 @@ function ChatWindowInner({
     if (!prompt || generatingImage || isBusy || !user) return;
     setInput("");
     setGeneratingImage(true);
+    const userMsgId = crypto.randomUUID();
+    const assistantMsgId = crypto.randomUUID();
+    // Optimistically show the user prompt
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] } as UIMessage,
+    ]);
     try {
-      // Send the user's prompt as a normal user message first (so it appears in chat)
-      await sendMessage({ text: `🎨 Generate image: ${prompt}` });
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -272,20 +277,27 @@ function ChatWindowInner({
       });
       if (!res.ok) throw new Error(await res.text());
       const { url } = (await res.json()) as { url: string };
-      // Persist assistant image message directly to DB and refresh
+      const assistantParts = [{ type: "text", text: `![generated image](${url})` }];
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantMsgId, role: "assistant", parts: assistantParts } as UIMessage,
+      ]);
+      // Persist to DB
       if (!temporary) {
         if (!threadCreated.current) {
           await supabase.from("threads").insert({ id: threadId, user_id: user.id, title: prompt.slice(0, 40) });
           threadCreated.current = true;
         }
-        await supabase.from("messages").insert({
-          thread_id: threadId,
-          user_id: user.id,
-          role: "assistant",
+        await supabase.from("messages").insert([
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          parts: [{ type: "text", text: `![generated image](${url})` }] as any,
-        });
-        window.location.reload();
+          { id: userMsgId, thread_id: threadId, user_id: user.id, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] as any },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { id: assistantMsgId, thread_id: threadId, user_id: user.id, role: "assistant", parts: assistantParts as any },
+        ]);
+        persistedIds.current.add(userMsgId);
+        persistedIds.current.add(assistantMsgId);
+        await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+        window.dispatchEvent(new CustomEvent("hola:threads-changed"));
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Image generation failed");
