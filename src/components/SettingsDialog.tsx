@@ -52,7 +52,7 @@ export function SettingsButton() {
 }
 
 function SettingsContent() {
-  const { theme, mode, fontFamily, fontSize, setTheme, setMode, setFontFamily, setFontSize } = useTheme();
+  const { theme, mode, fontFamily, fontSize, aiCanRename, setTheme, setMode, setFontFamily, setFontSize, setAiCanRename } = useTheme();
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
