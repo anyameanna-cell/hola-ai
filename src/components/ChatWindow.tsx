@@ -125,8 +125,14 @@ function ChatWindowInner({
   // Load profile name + recent thread titles+snippets for long-term memory
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
-      .then(({ data }) => setDisplayName(data?.display_name ?? null));
+    let cancelled = false;
+    const loadName = () => {
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setDisplayName(data?.display_name ?? null); });
+    };
+    loadName();
+    const onProfileChanged = () => loadName();
+    window.addEventListener("hola:profile-changed", onProfileChanged);
     (async () => {
       const { data: threads } = await supabase
         .from("threads").select("id, title")
@@ -146,8 +152,12 @@ function ChatWindowInner({
         const text = parts.map((p: any) => (p?.type === "text" ? p.text : "")).join("").slice(0, 140);
         firstByThread.set(m.thread_id, text);
       }
-      setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
+      if (!cancelled) setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
     })();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hola:profile-changed", onProfileChanged);
+    };
   }, [user, threadId]);
 
   const transport = useMemo(
