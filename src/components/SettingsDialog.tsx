@@ -80,12 +80,12 @@ function SettingsContent() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: trimmed })
-      .eq("id", user.id);
+      .upsert({ id: user.id, display_name: trimmed }, { onConflict: "id" });
     setSaving(false);
     if (error) toast.error("Could not save name");
     else {
       setSavedName(trimmed);
+      window.dispatchEvent(new CustomEvent("hola:profile-changed"));
       toast.success("Name updated");
     }
   };
