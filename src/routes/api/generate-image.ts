@@ -8,17 +8,49 @@ export const Route = createFileRoute("/api/generate-image")({
         if (!prompt || typeof prompt !== "string") {
           return new Response("prompt required", { status: 400 });
         }
-        const key = process.env.OPENAI_API_KEY;
-        if (!key) return new Response("Missing OPENAI_API_KEY", { status: 500 });
 
-        const res = await fetch("https://api.openai.com/v1/images/generations", {
+        // Prefer user-provided OpenAI key if present, otherwise Lovable AI Gateway.
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (openaiKey) {
+          try {
+            const res = await fetch("https://api.openai.com/v1/images/generations", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${openaiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "gpt-image-1",
+                prompt,
+                size: "1024x1024",
+                n: 1,
+              }),
+            });
+            if (res.ok) {
+              const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
+              const first = json.data?.[0];
+              const dataUrl = first?.b64_json
+                ? `data:image/png;base64,${first.b64_json}`
+                : first?.url ?? null;
+              if (dataUrl) return Response.json({ url: dataUrl });
+            }
+            // fall through to Lovable gateway if OpenAI fails
+          } catch { /* fall through */ }
+        }
+
+        const lovableKey = process.env.LOVABLE_API_KEY;
+        if (!lovableKey) {
+          return new Response("No image provider configured", { status: 500 });
+        }
+
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${key}`,
+            Authorization: `Bearer ${lovableKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-image-1",
+            model: "google/gemini-2.5-flash-image",
             prompt,
             size: "1024x1024",
             n: 1,

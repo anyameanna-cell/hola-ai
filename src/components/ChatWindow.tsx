@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Square, Sparkles, Ghost, ImageIcon, Loader2 } from "lucide-react";
+import { ArrowUp, Square, Sparkles, Ghost, ImageIcon, Loader2, Mic, MicOff, Volume2, VolumeX, Paperclip, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -114,8 +114,13 @@ function ChatWindowInner({
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [attachments, setAttachments] = useState<{ id: string; url: string; mediaType: string; name: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
@@ -125,8 +130,14 @@ function ChatWindowInner({
   // Load profile name + recent thread titles+snippets for long-term memory
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
-      .then(({ data }) => setDisplayName(data?.display_name ?? null));
+    let cancelled = false;
+    const loadName = () => {
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setDisplayName(data?.display_name ?? null); });
+    };
+    loadName();
+    const onProfileChanged = () => loadName();
+    window.addEventListener("hola:profile-changed", onProfileChanged);
     (async () => {
       const { data: threads } = await supabase
         .from("threads").select("id, title")
@@ -146,8 +157,12 @@ function ChatWindowInner({
         const text = parts.map((p: any) => (p?.type === "text" ? p.text : "")).join("").slice(0, 140);
         firstByThread.set(m.thread_id, text);
       }
-      setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
+      if (!cancelled) setRecentChats(threads.map((t) => ({ title: t.title, snippet: firstByThread.get(t.id) })));
     })();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hola:profile-changed", onProfileChanged);
+    };
   }, [user, threadId]);
 
   const transport = useMemo(
@@ -306,13 +321,69 @@ function ChatWindowInner({
     }
   };
 
+  const toggleVoiceInput = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR: any = (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+    if (!SR) {
+      toast.error("Voice input isn't supported in this browser");
+      return;
+    }
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    let finalText = "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setInput((prev) => (prev ? prev + " " : "") + (finalText || interim).trim());
+    };
+    rec.onerror = () => { setListening(false); };
+    rec.onend = () => { setListening(false); recognitionRef.current = null; };
+    recognitionRef.current = rec;
+    setListening(true);
+    try { rec.start(); } catch { setListening(false); }
+  };
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    for (const f of files) {
+      if (f.size > 8 * 1024 * 1024) { toast.error(`${f.name} is too large (max 8MB)`); continue; }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result));
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+      setAttachments((prev) => [...prev, { id: crypto.randomUUID(), url: dataUrl, mediaType: f.type, name: f.name }]);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || status === "streaming" || status === "submitted") return;
+    if ((!text && attachments.length === 0) || status === "streaming" || status === "submitted") return;
     if (!user) return;
     setInput("");
-    await sendMessage({ text });
+    const atts = attachments;
+    setAttachments([]);
+    if (atts.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fileParts: any[] = atts.map((a) => ({ type: "file", url: a.url, mediaType: a.mediaType }));
+      await sendMessage({ role: "user", parts: [...fileParts, { type: "text", text: text || "" }] });
+    } else {
+      await sendMessage({ text });
+    }
   };
 
   const showEmpty = messages.length === 0;
@@ -341,6 +412,27 @@ function ChatWindowInner({
 
       <div className="border-t bg-background/80 backdrop-blur">
         <form onSubmit={handleSubmit} className="mx-auto max-w-3xl w-full px-4 py-3">
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((a) => (
+                <div key={a.id} className="relative group">
+                  {a.mediaType.startsWith("image/") ? (
+                    <img src={a.url} alt={a.name} className="h-16 w-16 object-cover rounded-lg border" />
+                  ) : (
+                    <div className="h-16 px-3 flex items-center rounded-lg border bg-card text-xs max-w-[180px] truncate">{a.name}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setAttachments((p) => p.filter((x) => x.id !== a.id))}
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-background border flex items-center justify-center"
+                    aria-label="Remove attachment"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition">
             <Textarea
               ref={textareaRef}
@@ -354,10 +446,29 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-12 pr-14 focus-visible:ring-0 shadow-none overflow-hidden"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-28 pr-24 text-center placeholder:text-center focus-visible:ring-0 shadow-none overflow-hidden"
               autoFocus
             />
-            <div className="absolute left-2 bottom-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={handleFilePick}
+            />
+            <div className="absolute left-2 bottom-2 flex gap-1">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title="Attach image"
+                disabled={isBusy}
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
               <Button
                 type="button"
                 size="icon"
@@ -369,6 +480,16 @@ function ChatWindowInner({
               >
                 {generatingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
               </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title={listening ? "Stop listening" : "Voice input"}
+                onClick={toggleVoiceInput}
+                className={`rounded-full h-9 w-9 ${listening ? "text-red-500 animate-pulse" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
             </div>
             <div className="absolute right-2 bottom-2">
               {isBusy ? (
@@ -376,7 +497,7 @@ function ChatWindowInner({
                   <Square className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" size="icon" disabled={!input.trim()} className="rounded-full bg-brand-gradient text-white border-0 shadow-brand h-9 w-9 disabled:opacity-40">
+                <Button type="submit" size="icon" disabled={!input.trim() && attachments.length === 0} className="rounded-full bg-brand-gradient text-white border-0 shadow-brand h-9 w-9 disabled:opacity-40">
                   <ArrowUp className="h-4 w-4" />
                 </Button>
               )}
@@ -395,23 +516,82 @@ function ChatWindowInner({
 function MessageBubble({ message, streaming }: { message: UIMessage; streaming: boolean }) {
   const isUser = message.role === "user";
   const text = partsToText(message.parts);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageParts = (message.parts as any[]).filter((p) => p?.type === "file" && typeof p.url === "string" && String(p.mediaType ?? "").startsWith("image/"));
 
   if (isUser) {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 whitespace-pre-wrap">
-          {text}
+        <div className="max-w-[80%] space-y-2">
+          {imageParts.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              {imageParts.map((p, i) => (
+                <img key={i} src={p.url} alt="" className="max-h-48 rounded-lg border" />
+              ))}
+            </div>
+          )}
+          {text && (
+            <div className="rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 whitespace-pre-wrap">
+              {text}
+            </div>
+          )}
         </div>
       </motion.div>
     );
   }
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 group">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className={`flex-1 min-w-0 ${streaming ? "streaming-caret" : ""}`}>
-        <MarkdownContent>{text}</MarkdownContent>
+        <MarkdownContent streaming={streaming}>{text}</MarkdownContent>
+        {!streaming && text && <SpeakButton text={text} />}
       </div>
     </motion.div>
+  );
+}
+
+function SpeakButton({ text }: { text: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggle = async () => {
+    if (playing) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlaying(false);
+      return;
+    }
+    try {
+      setPlaying(true);
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      await audio.play();
+    } catch (err) {
+      setPlaying(false);
+      toast.error(err instanceof Error ? err.message : "Could not play audio");
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition"
+      title={playing ? "Stop" : "Read aloud"}
+    >
+      {playing ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+      {playing ? "Stop" : "Read aloud"}
+    </button>
   );
 }
 

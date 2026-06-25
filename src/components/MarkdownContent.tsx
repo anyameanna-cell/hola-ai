@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Maximize2, X } from "lucide-react";
 import mermaid from "mermaid";
 
 // Init mermaid exactly once for the page
@@ -40,38 +40,93 @@ function enrichTooltips(host: HTMLElement) {
   });
 }
 
-const MermaidBlock = memo(function MermaidBlock({ code }: { code: string }) {
+const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: string; streaming?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [err, setErr] = useState<string | null>(null);
-  // Stable id per code string so re-renders don't re-render mermaid
+  const [svg, setSvg] = useState<string | null>(null);
+  const [zoomed, setZoomed] = useState(false);
   const id = useMemo(() => `mmd-${Math.abs(hash(code))}`, [code]);
 
   useEffect(() => {
+    if (streaming) return; // wait until streaming finishes to render
     ensureMermaid();
     let cancelled = false;
     (async () => {
       try {
+        // Pre-validate to avoid mermaid injecting its bomb error SVG into the DOM
+        const ok = await mermaid.parse(code, { suppressErrors: true });
+        if (!ok) {
+          if (!cancelled) setSvg(null);
+          return;
+        }
         const { svg } = await mermaid.render(id, code);
-        if (cancelled || !ref.current) return;
-        ref.current.innerHTML = svg;
-        enrichTooltips(ref.current);
-        setErr(null);
-      } catch (e) {
-        if (!cancelled) setErr(e instanceof Error ? e.message : "Diagram error");
+        if (cancelled) return;
+        setSvg(svg);
+      } catch {
+        if (!cancelled) setSvg(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [code, id]);
+  }, [code, id, streaming]);
 
-  if (err) {
+  useEffect(() => {
+    if (svg && ref.current) enrichTooltips(ref.current);
+  }, [svg]);
+
+  if (streaming) {
     return (
-      <pre className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive overflow-auto">
-        Mermaid error: {err}
-        {"\n\n"}{code}
+      <div className="my-3 rounded-lg border bg-card p-4 text-xs text-muted-foreground italic">
+        Generating diagram…
+      </div>
+    );
+  }
+
+  if (!svg) {
+    return (
+      <pre className="my-3 rounded-lg border bg-muted/40 p-3 text-xs overflow-auto whitespace-pre-wrap">
+        <code>{code}</code>
       </pre>
     );
   }
-  return <div ref={ref} className="mermaid-host my-3 rounded-lg border bg-card p-3 overflow-auto flex justify-center" />;
+
+  return (
+    <>
+      <div
+        className="mermaid-host group relative my-3 rounded-lg border bg-card p-3 overflow-auto flex justify-center cursor-zoom-in"
+        onClick={() => setZoomed(true)}
+        title="Click to enlarge"
+      >
+        <div ref={ref} dangerouslySetInnerHTML={{ __html: svg }} />
+        <button
+          type="button"
+          className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border opacity-0 group-hover:opacity-100 transition"
+          onClick={(e) => { e.stopPropagation(); setZoomed(true); }}
+          aria-label="Enlarge diagram"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {zoomed && (
+        <div
+          className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setZoomed(false)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-full bg-card border"
+            onClick={() => setZoomed(false)}
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div
+            className="max-w-[95vw] max-h-[90vh] overflow-auto bg-card rounded-xl p-6 border [&_svg]:max-w-none [&_svg]:w-auto [&_svg]:h-auto"
+            onClick={(e) => e.stopPropagation()}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </div>
+      )}
+    </>
+  );
 });
 
 function hash(s: string): number {
@@ -113,13 +168,46 @@ const CodeBlock = memo(function CodeBlock({ language, code }: { language: string
   );
 });
 
-export function MarkdownContent({ children }: { children: string }) {
+function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <img
+        src={src}
+        alt={alt ?? ""}
+        loading="lazy"
+        onClick={() => setOpen(true)}
+        className="my-3 max-w-full rounded-lg border cursor-zoom-in"
+      />
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setOpen(false)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-full bg-card border"
+            onClick={() => setOpen(false)}
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img src={src} alt={alt ?? ""} className="max-w-[95vw] max-h-[90vh] rounded-xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </>
+  );
+}
+
+export function MarkdownContent({ children, streaming }: { children: string; streaming?: boolean }) {
   return (
     <div className="prose-chat text-foreground">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           hr: () => <hr className="my-6 border-border" />,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          img: ({ src, alt }: any) => <ZoomableImage src={String(src ?? "")} alt={alt} />,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           code({ inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || "");
@@ -132,7 +220,7 @@ export function MarkdownContent({ children }: { children: string }) {
                 </code>
               );
             }
-            if (lang === "mermaid") return <MermaidBlock code={code} />;
+            if (lang === "mermaid") return <MermaidBlock code={code} streaming={streaming} />;
             return <CodeBlock language={lang} code={code} />;
           },
         }}
