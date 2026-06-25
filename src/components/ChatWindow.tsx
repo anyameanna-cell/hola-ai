@@ -516,23 +516,82 @@ function ChatWindowInner({
 function MessageBubble({ message, streaming }: { message: UIMessage; streaming: boolean }) {
   const isUser = message.role === "user";
   const text = partsToText(message.parts);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageParts = (message.parts as any[]).filter((p) => p?.type === "file" && typeof p.url === "string" && String(p.mediaType ?? "").startsWith("image/"));
 
   if (isUser) {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 whitespace-pre-wrap">
-          {text}
+        <div className="max-w-[80%] space-y-2">
+          {imageParts.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              {imageParts.map((p, i) => (
+                <img key={i} src={p.url} alt="" className="max-h-48 rounded-lg border" />
+              ))}
+            </div>
+          )}
+          {text && (
+            <div className="rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 whitespace-pre-wrap">
+              {text}
+            </div>
+          )}
         </div>
       </motion.div>
     );
   }
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 group">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className={`flex-1 min-w-0 ${streaming ? "streaming-caret" : ""}`}>
-        <MarkdownContent>{text}</MarkdownContent>
+        <MarkdownContent streaming={streaming}>{text}</MarkdownContent>
+        {!streaming && text && <SpeakButton text={text} />}
       </div>
     </motion.div>
+  );
+}
+
+function SpeakButton({ text }: { text: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggle = async () => {
+    if (playing) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlaying(false);
+      return;
+    }
+    try {
+      setPlaying(true);
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      await audio.play();
+    } catch (err) {
+      setPlaying(false);
+      toast.error(err instanceof Error ? err.message : "Could not play audio");
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition"
+      title={playing ? "Stop" : "Read aloud"}
+    >
+      {playing ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+      {playing ? "Stop" : "Read aloud"}
+    </button>
   );
 }
 
