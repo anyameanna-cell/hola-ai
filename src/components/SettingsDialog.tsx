@@ -187,23 +187,7 @@ function SettingsContent() {
               <Label htmlFor="ai-rename">Let Hola rename chats</Label>
               <p className="text-xs text-muted-foreground">Hola can update conversation titles as the topic evolves.</p>
             </div>
-            <button
-              id="ai-rename"
-              role="switch"
-              aria-checked={aiCanRename}
-              onClick={() => setAiCanRename(!aiCanRename)}
-              className={cn(
-                "relative h-6 w-11 rounded-full transition",
-                aiCanRename ? "bg-primary" : "bg-muted",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform",
-                  aiCanRename ? "translate-x-5" : "translate-x-0.5",
-                )}
-              />
-            </button>
+            <Switch id="ai-rename" checked={aiCanRename} onCheckedChange={setAiCanRename} />
           </div>
         </section>
       </div>
