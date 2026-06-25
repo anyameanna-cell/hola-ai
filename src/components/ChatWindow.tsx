@@ -114,8 +114,13 @@ function ChatWindowInner({
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [attachments, setAttachments] = useState<{ id: string; url: string; mediaType: string; name: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
