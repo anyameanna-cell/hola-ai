@@ -203,7 +203,7 @@ function ChatWindowInner({
     [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats, memories],
   );
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
+  const { messages, sendMessage, status, stop } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
