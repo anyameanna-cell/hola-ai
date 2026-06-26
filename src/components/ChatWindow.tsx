@@ -128,7 +128,7 @@ function ChatWindowInner({
   const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread titles+snippets for long-term memory
+  // Load profile name + recent thread snippets + ultra memories for context
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -136,9 +136,22 @@ function ChatWindowInner({
       supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
         .then(({ data }) => { if (!cancelled) setDisplayName(data?.display_name ?? null); });
     };
+    const loadMemories = () => {
+      supabase.from("memories").select("id, content").eq("user_id", user.id)
+        .order("created_at", { ascending: false }).limit(80)
+        .then(({ data }) => {
+          if (cancelled) return;
+          const rows = data ?? [];
+          setMemories(rows.map((r) => r.content));
+          savedMemoryIds.current = new Set(rows.map((r) => r.id));
+        });
+    };
     loadName();
+    loadMemories();
     const onProfileChanged = () => loadName();
+    const onMemoryChanged = () => loadMemories();
     window.addEventListener("hola:profile-changed", onProfileChanged);
+    window.addEventListener("hola:memory-changed", onMemoryChanged);
     (async () => {
       const { data: threads } = await supabase
         .from("threads").select("id, title")
@@ -163,6 +176,7 @@ function ChatWindowInner({
     return () => {
       cancelled = true;
       window.removeEventListener("hola:profile-changed", onProfileChanged);
+      window.removeEventListener("hola:memory-changed", onMemoryChanged);
     };
   }, [user, threadId]);
 
