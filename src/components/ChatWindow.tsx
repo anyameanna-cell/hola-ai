@@ -438,7 +438,7 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-28 pr-24 text-center placeholder:text-center focus-visible:ring-0 shadow-none overflow-hidden"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-24 pr-14 py-4 text-left placeholder:text-left focus-visible:ring-0 shadow-none overflow-hidden leading-6"
               autoFocus
             />
             <input
@@ -449,7 +449,7 @@ function ChatWindowInner({
               hidden
               onChange={handleFilePick}
             />
-            <div className="absolute left-2 bottom-2 flex gap-1">
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex gap-1">
               <Button
                 type="button"
                 size="icon"
@@ -460,17 +460,6 @@ function ChatWindowInner({
                 className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
               >
                 <Paperclip className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                title="Generate image from prompt"
-                disabled={!input.trim() || generatingImage || isBusy}
-                onClick={handleGenerateImage}
-                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
-              >
-                {generatingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
               </Button>
               <Button
                 type="button"
