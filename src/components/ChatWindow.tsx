@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Square, Sparkles, Ghost, ImageIcon, Loader2, Mic, MicOff, Volume2, VolumeX, Paperclip, X } from "lucide-react";
+import { ArrowUp, Square, Sparkles, Ghost, Mic, MicOff, Volume2, VolumeX, Paperclip, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -113,7 +113,7 @@ function ChatWindowInner({
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
-  const [generatingImage, setGeneratingImage] = useState(false);
+  const [memories, setMemories] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
   const [attachments, setAttachments] = useState<{ id: string; url: string; mediaType: string; name: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,6 +122,7 @@ function ChatWindowInner({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
+  const savedMemoryIds = useRef<Set<string>>(new Set());
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
   const lastRetitledAt = useRef(0);
