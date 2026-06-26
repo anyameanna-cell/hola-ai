@@ -552,10 +552,21 @@ function SpeakButton({ text }: { text: string }) {
       if (!res.ok) throw new Error(await res.text());
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.src = url;
       audioRef.current = audio;
-      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+      // Wait until the whole clip is buffered, then play from sample 0.
+      await new Promise<void>((resolve, reject) => {
+        audio.oncanplaythrough = () => resolve();
+        audio.onerror = () => reject(new Error("Audio failed to load"));
+        // Safety net if canplaythrough never fires.
+        setTimeout(resolve, 4000);
+      });
+      audio.currentTime = 0;
       await audio.play();
     } catch (err) {
       setPlaying(false);
