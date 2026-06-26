@@ -13,6 +13,7 @@ export const Route = createFileRoute("/api/tts")({
 
         // Strip markdown so TTS reads only the spoken content (avoids skipped intros).
         const clean = text
+          .replace(/<!--[\s\S]*?-->/g, " ")
           .replace(/```[\s\S]*?```/g, " ")
           .replace(/`[^`]*`/g, " ")
           .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
