@@ -472,7 +472,7 @@ function ChatWindowInner({
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
             </div>
-            <div className="absolute right-2 bottom-2">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
                 <Button type="button" size="icon" onClick={() => stop()} className="rounded-full bg-foreground text-background hover:opacity-90 h-9 w-9">
                   <Square className="h-4 w-4" />
