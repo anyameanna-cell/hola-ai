@@ -119,7 +119,7 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
             <X className="h-5 w-5" />
           </button>
           <div
-            className="max-w-[95vw] max-h-[90vh] overflow-auto bg-card rounded-xl p-6 border [&_svg]:max-w-none [&_svg]:w-auto [&_svg]:h-auto"
+            className="max-w-[95vw] max-h-[90vh] overflow-auto bg-card rounded-xl p-6 border [&_svg]:!max-w-none [&_svg]:!w-auto [&_svg]:!h-auto [&_svg]:!min-w-[600px]"
             onClick={(e) => e.stopPropagation()}
             dangerouslySetInnerHTML={{ __html: svg }}
           />

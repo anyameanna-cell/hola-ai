@@ -11,6 +11,19 @@ export const Route = createFileRoute("/api/tts")({
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 
+        // Strip markdown so TTS reads only the spoken content (avoids skipped intros).
+        const clean = text
+          .replace(/<!--[\s\S]*?-->/g, " ")
+          .replace(/```[\s\S]*?```/g, " ")
+          .replace(/`[^`]*`/g, " ")
+          .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+          .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+          .replace(/^#+\s*/gm, "")
+          .replace(/[*_>#~]/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 4000);
+
         const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
           method: "POST",
           headers: {
@@ -19,8 +32,10 @@ export const Route = createFileRoute("/api/tts")({
           },
           body: JSON.stringify({
             model: "openai/gpt-4o-mini-tts",
-            input: text.slice(0, 4000),
-            voice: voice || "alloy",
+            input: clean,
+            voice: voice || "shimmer",
+            instructions:
+              "Speak as a gentle, warm, young woman. Soft, friendly, calm pacing. Begin clearly from the very first word.",
             response_format: "mp3",
           }),
         });
@@ -28,8 +43,14 @@ export const Route = createFileRoute("/api/tts")({
           const txt = await res.text().catch(() => "");
           return new Response(txt || "TTS failed", { status: res.status });
         }
-        return new Response(res.body, {
-          headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
+        // Buffer to a complete blob so the browser can play from sample 0 reliably.
+        const buf = await res.arrayBuffer();
+        return new Response(buf, {
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Content-Length": String(buf.byteLength),
+            "Cache-Control": "no-store",
+          },
         });
       },
     },

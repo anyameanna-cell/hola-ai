@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Square, Sparkles, Ghost, ImageIcon, Loader2, Mic, MicOff, Volume2, VolumeX, Paperclip, X } from "lucide-react";
+import { ArrowUp, Square, Sparkles, Ghost, Mic, MicOff, Volume2, VolumeX, Paperclip, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -113,7 +113,7 @@ function ChatWindowInner({
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
-  const [generatingImage, setGeneratingImage] = useState(false);
+  const [memories, setMemories] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
   const [attachments, setAttachments] = useState<{ id: string; url: string; mediaType: string; name: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,12 +122,13 @@ function ChatWindowInner({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const persistedIds = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
+  const savedMemoryIds = useRef<Set<string>>(new Set());
   const threadCreated = useRef(initialThreadExists);
   const titleGenerated = useRef(initialTitleAlreadySet);
   const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread titles+snippets for long-term memory
+  // Load profile name + recent thread snippets + ultra memories for context
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -135,9 +136,22 @@ function ChatWindowInner({
       supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()
         .then(({ data }) => { if (!cancelled) setDisplayName(data?.display_name ?? null); });
     };
+    const loadMemories = () => {
+      supabase.from("memories").select("id, content").eq("user_id", user.id)
+        .order("created_at", { ascending: false }).limit(80)
+        .then(({ data }) => {
+          if (cancelled) return;
+          const rows = data ?? [];
+          setMemories(rows.map((r) => r.content));
+          savedMemoryIds.current = new Set(rows.map((r) => r.id));
+        });
+    };
     loadName();
+    loadMemories();
     const onProfileChanged = () => loadName();
+    const onMemoryChanged = () => loadMemories();
     window.addEventListener("hola:profile-changed", onProfileChanged);
+    window.addEventListener("hola:memory-changed", onMemoryChanged);
     (async () => {
       const { data: threads } = await supabase
         .from("threads").select("id, title")
@@ -162,6 +176,7 @@ function ChatWindowInner({
     return () => {
       cancelled = true;
       window.removeEventListener("hola:profile-changed", onProfileChanged);
+      window.removeEventListener("hola:memory-changed", onMemoryChanged);
     };
   }, [user, threadId]);
 
@@ -180,14 +195,15 @@ function ChatWindowInner({
               theme, mode, fontFamily, fontSize,
               temporary,
               recentChats,
+              memories,
             },
           },
         }),
       }),
-    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats],
+    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats, memories],
   );
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
+  const { messages, sendMessage, status, stop } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
@@ -272,54 +288,30 @@ function ChatWindowInner({
     ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
   }, [input]);
 
-  const handleGenerateImage = async () => {
-    const prompt = input.trim();
-    if (!prompt || generatingImage || isBusy || !user) return;
-    setInput("");
-    setGeneratingImage(true);
-    const userMsgId = crypto.randomUUID();
-    const assistantMsgId = crypto.randomUUID();
-    // Optimistically show the user prompt
-    setMessages((prev) => [
-      ...prev,
-      { id: userMsgId, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] } as UIMessage,
-    ]);
-    try {
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const { url } = (await res.json()) as { url: string };
-      const assistantParts = [{ type: "text", text: `![generated image](${url})` }];
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantMsgId, role: "assistant", parts: assistantParts } as UIMessage,
-      ]);
-      // Persist to DB
-      if (!temporary) {
-        if (!threadCreated.current) {
-          await supabase.from("threads").insert({ id: threadId, user_id: user.id, title: prompt.slice(0, 40) });
-          threadCreated.current = true;
-        }
-        await supabase.from("messages").insert([
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          { id: userMsgId, thread_id: threadId, user_id: user.id, role: "user", parts: [{ type: "text", text: `🎨 ${prompt}` }] as any },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          { id: assistantMsgId, thread_id: threadId, user_id: user.id, role: "assistant", parts: assistantParts as any },
-        ]);
-        persistedIds.current.add(userMsgId);
-        persistedIds.current.add(assistantMsgId);
-        await supabase.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
-        window.dispatchEvent(new CustomEvent("hola:threads-changed"));
+  // Extract <!--REMEMBER: ...--> notes from finished assistant messages and persist as ultra memories.
+  useEffect(() => {
+    if (temporary || !user) return;
+    if (status === "streaming" || status === "submitted") return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    const text = partsToText(last.parts);
+    const matches = [...text.matchAll(/<!--\s*REMEMBER:\s*([^>]+?)\s*-->/gi)].map((m) =>
+      m[1].replace(/\s+/g, " ").trim(),
+    ).filter(Boolean);
+    if (matches.length === 0) return;
+    const existing = new Set(memories.map((m) => m.toLowerCase()));
+    const fresh = matches.filter((m) => !existing.has(m.toLowerCase()));
+    if (fresh.length === 0) return;
+    (async () => {
+      const rows = fresh.map((content) => ({ user_id: user.id, content: content.slice(0, 500) }));
+      const { data, error } = await supabase.from("memories").insert(rows).select("id, content");
+      if (!error && data) {
+        setMemories((prev) => [...data.map((d) => d.content), ...prev]);
+        for (const d of data) savedMemoryIds.current.add(d.id);
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Image generation failed");
-    } finally {
-      setGeneratingImage(false);
-    }
-  };
+    })();
+  }, [messages, status, temporary, user, memories]);
+
 
   const toggleVoiceInput = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -446,7 +438,7 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-28 pr-24 text-center placeholder:text-center focus-visible:ring-0 shadow-none overflow-hidden"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-24 pr-14 py-4 text-left placeholder:text-left focus-visible:ring-0 shadow-none overflow-hidden leading-6"
               autoFocus
             />
             <input
@@ -457,7 +449,7 @@ function ChatWindowInner({
               hidden
               onChange={handleFilePick}
             />
-            <div className="absolute left-2 bottom-2 flex gap-1">
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex gap-1">
               <Button
                 type="button"
                 size="icon"
@@ -473,17 +465,6 @@ function ChatWindowInner({
                 type="button"
                 size="icon"
                 variant="ghost"
-                title="Generate image from prompt"
-                disabled={!input.trim() || generatingImage || isBusy}
-                onClick={handleGenerateImage}
-                className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground"
-              >
-                {generatingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
                 title={listening ? "Stop listening" : "Voice input"}
                 onClick={toggleVoiceInput}
                 className={`rounded-full h-9 w-9 ${listening ? "text-red-500 animate-pulse" : "text-muted-foreground hover:text-foreground"}`}
@@ -491,7 +472,7 @@ function ChatWindowInner({
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
             </div>
-            <div className="absolute right-2 bottom-2">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
                 <Button type="button" size="icon" onClick={() => stop()} className="rounded-full bg-foreground text-background hover:opacity-90 h-9 w-9">
                   <Square className="h-4 w-4" />
@@ -571,10 +552,21 @@ function SpeakButton({ text }: { text: string }) {
       if (!res.ok) throw new Error(await res.text());
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.src = url;
       audioRef.current = audio;
-      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+      // Wait until the whole clip is buffered, then play from sample 0.
+      await new Promise<void>((resolve, reject) => {
+        audio.oncanplaythrough = () => resolve();
+        audio.onerror = () => reject(new Error("Audio failed to load"));
+        // Safety net if canplaythrough never fires.
+        setTimeout(resolve, 4000);
+      });
+      audio.currentTime = 0;
       await audio.play();
     } catch (err) {
       setPlaying(false);
