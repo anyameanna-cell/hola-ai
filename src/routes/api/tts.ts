@@ -4,7 +4,7 @@ export const Route = createFileRoute("/api/tts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { text, voice } = (await request.json()) as { text?: string; voice?: string };
+        const { text, voice, speed } = (await request.json()) as { text?: string; voice?: string; speed?: number };
         if (!text || typeof text !== "string") {
           return new Response("text required", { status: 400 });
         }
