@@ -84,7 +84,12 @@ export function SettingsButton() {
 }
 
 function SettingsContent() {
-  const { theme, mode, fontFamily, fontSize, aiCanRename, setTheme, setMode, setFontFamily, setFontSize, setAiCanRename } = useTheme();
+  const {
+    theme, mode, fontFamily, fontSize, aiCanRename,
+    messageLength, behavior, ttsVoice, ttsSpeed, ttsVolume,
+    setTheme, setMode, setFontFamily, setFontSize, setAiCanRename,
+    setMessageLength, setBehavior, setTtsVoice, setTtsSpeed, setTtsVolume,
+  } = useTheme();
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
