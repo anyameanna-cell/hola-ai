@@ -226,6 +226,59 @@ function SettingsContent() {
             <Switch id="ai-rename" checked={aiCanRename} onCheckedChange={setAiCanRename} />
           </div>
         </section>
+
+        <section className="space-y-2">
+          <Label>Message length</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {LENGTHS.map((l) => (
+              <Button key={l.id} variant={messageLength === l.id ? "default" : "outline"} size="sm" onClick={() => setMessageLength(l.id)}>
+                {l.label}
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <Label>Behavior</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {BEHAVIORS.map((b) => (
+              <Button key={b.id} variant={behavior === b.id ? "default" : "outline"} size="sm" onClick={() => setBehavior(b.id)}>
+                {b.label}
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3 rounded-lg border p-3">
+          <Label>Read aloud voice</Label>
+          <div className="grid grid-cols-1 gap-1.5">
+            {VOICES.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setTtsVoice(v.id)}
+                className={cn(
+                  "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition",
+                  ttsVoice === v.id ? "border-primary bg-accent/40" : "border-border hover:border-muted-foreground/40",
+                )}
+              >
+                <span className="font-medium">{v.label}</span>
+                <span className="text-xs text-muted-foreground">{v.hint}</span>
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Speed</span><span>{ttsSpeed.toFixed(2)}×</span>
+            </div>
+            <Slider min={0.5} max={1.75} step={0.05} value={[ttsSpeed]} onValueChange={([v]) => setTtsSpeed(v)} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Volume</span><span>{Math.round(ttsVolume * 100)}%</span>
+            </div>
+            <Slider min={0} max={1} step={0.05} value={[ttsVolume]} onValueChange={([v]) => setTtsVolume(v)} />
+          </div>
+        </section>
       </div>
     </DialogContent>
   );
