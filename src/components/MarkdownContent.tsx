@@ -74,8 +74,28 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
 
   if (streaming) {
     return (
-      <div className="my-3 rounded-lg border bg-card p-4 text-xs text-muted-foreground italic">
-        Generating diagram…
+      <div className="my-3 rounded-lg border bg-card p-4 flex items-center gap-3">
+        <svg width="72" height="56" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching diagram">
+          <line x1="16" y1="16" x2="40" y2="16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <line x1="40" y1="16" x2="40" y2="40" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <line x1="16" y1="16" x2="40" y2="40" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <g style={{ animation: "hola-shape-float-a 2.2s ease-in-out infinite" }}>
+            <polygon points="16,10 22,20 10,20" fill="currentColor" opacity="0.9" />
+          </g>
+          <g style={{ animation: "hola-shape-float-b 2.4s ease-in-out infinite" }}>
+            <rect x="34" y="10" width="12" height="12" rx="1.5" fill="currentColor" opacity="0.9" />
+          </g>
+          <g style={{ animation: "hola-shape-float-c 2.6s ease-in-out infinite" }}>
+            <circle cx="40" cy="40" r="6" fill="currentColor" opacity="0.9" />
+          </g>
+        </svg>
+        <span className="text-sm text-muted-foreground italic">Generating diagram…</span>
       </div>
     );
   }
