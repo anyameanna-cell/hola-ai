@@ -38,6 +38,18 @@ function partsToText(parts: UIMessage["parts"]): string {
   return parts.map((p) => (p.type === "text" ? p.text : "")).join("");
 }
 
+// Hide the hidden <!--REMEMBER: ...--> notes from what the user sees.
+function stripMemoryComments(s: string): string {
+  return s.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+function detectImageIntent(s: string): boolean {
+  return /\b(?:generate|create|draw|make|design|render|paint|produce|show me)\b[^.?!\n]*\b(?:image|picture|photo|photograph|illustration|drawing|artwork|art|painting|sketch|wallpaper|poster|logo|icon)\b/i.test(s);
+}
+function detectDiagramIntent(s: string): boolean {
+  return /\b(?:diagram|flowchart|flow chart|mermaid|graph|chart|visuali[sz]e|architecture)\b/i.test(s);
+}
+
 export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   const { user } = useAuth();
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null);
