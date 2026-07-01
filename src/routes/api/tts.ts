@@ -36,6 +36,7 @@ export const Route = createFileRoute("/api/tts")({
             voice: voice || "shimmer",
             instructions:
               "Speak as a gentle, warm, young woman. Soft, friendly, calm pacing. Begin clearly from the very first word.",
+            speed: typeof speed === "number" && speed >= 0.5 && speed <= 2 ? speed : 1.0,
             response_format: "mp3",
           }),
         });
