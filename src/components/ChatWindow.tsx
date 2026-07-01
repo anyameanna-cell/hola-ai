@@ -408,10 +408,16 @@ function ChatWindowInner({
           <div className="mx-auto max-w-3xl w-full px-4 py-6 space-y-6">
             <AnimatePresence initial={false}>
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} />
+                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} ttsVoice={ttsVoice} ttsSpeed={ttsSpeed} ttsVolume={ttsVolume} />
               ))}
             </AnimatePresence>
-            {status === "submitted" && <ThinkingBubble />}
+            {status === "submitted" && (() => {
+              const lu = [...messages].reverse().find((m) => m.role === "user");
+              const t = lu ? partsToText(lu.parts) : "";
+              if (detectImageIntent(t)) return <ImageGenBubble />;
+              if (detectDiagramIntent(t)) return <DiagramGenBubble />;
+              return <ThinkingBubble />;
+            })()}
           </div>
         )}
       </div>
