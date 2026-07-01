@@ -38,6 +38,18 @@ function partsToText(parts: UIMessage["parts"]): string {
   return parts.map((p) => (p.type === "text" ? p.text : "")).join("");
 }
 
+// Hide the hidden <!--REMEMBER: ...--> notes from what the user sees.
+function stripMemoryComments(s: string): string {
+  return s.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+function detectImageIntent(s: string): boolean {
+  return /\b(?:generate|create|draw|make|design|render|paint|produce|show me)\b[^.?!\n]*\b(?:image|picture|photo|photograph|illustration|drawing|artwork|art|painting|sketch|wallpaper|poster|logo|icon)\b/i.test(s);
+}
+function detectDiagramIntent(s: string): boolean {
+  return /\b(?:diagram|flowchart|flow chart|mermaid|graph|chart|visuali[sz]e|architecture)\b/i.test(s);
+}
+
 export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   const { user } = useAuth();
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null);
@@ -109,7 +121,7 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
-  const { theme, mode, fontFamily, fontSize, aiCanRename } = useTheme();
+  const { theme, mode, fontFamily, fontSize, aiCanRename, messageLength, behavior, ttsVoice, ttsSpeed, ttsVolume } = useTheme();
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
@@ -196,11 +208,13 @@ function ChatWindowInner({
               temporary,
               recentChats,
               memories,
+              messageLength,
+              behavior,
             },
           },
         }),
       }),
-    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats, memories],
+    [displayName, user, theme, mode, fontFamily, fontSize, temporary, recentChats, memories, messageLength, behavior],
   );
 
   const { messages, sendMessage, status, stop } = useChat({
@@ -394,10 +408,16 @@ function ChatWindowInner({
           <div className="mx-auto max-w-3xl w-full px-4 py-6 space-y-6">
             <AnimatePresence initial={false}>
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} />
+                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} ttsVoice={ttsVoice} ttsSpeed={ttsSpeed} ttsVolume={ttsVolume} />
               ))}
             </AnimatePresence>
-            {status === "submitted" && <ThinkingBubble />}
+            {status === "submitted" && (() => {
+              const lu = [...messages].reverse().find((m) => m.role === "user");
+              const t = lu ? partsToText(lu.parts) : "";
+              if (detectImageIntent(t)) return <ImageGenBubble />;
+              if (detectDiagramIntent(t)) return <DiagramGenBubble />;
+              return <ThinkingBubble />;
+            })()}
           </div>
         )}
       </div>
@@ -494,9 +514,10 @@ function ChatWindowInner({
   );
 }
 
-function MessageBubble({ message, streaming }: { message: UIMessage; streaming: boolean }) {
+function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume }: { message: UIMessage; streaming: boolean; ttsVoice: string; ttsSpeed: number; ttsVolume: number }) {
   const isUser = message.role === "user";
-  const text = partsToText(message.parts);
+  const rawText = partsToText(message.parts);
+  const text = isUser ? rawText : stripMemoryComments(rawText);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const imageParts = (message.parts as any[]).filter((p) => p?.type === "file" && typeof p.url === "string" && String(p.mediaType ?? "").startsWith("image/"));
 
@@ -525,13 +546,13 @@ function MessageBubble({ message, streaming }: { message: UIMessage; streaming: 
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className={`flex-1 min-w-0 ${streaming ? "streaming-caret" : ""}`}>
         <MarkdownContent streaming={streaming}>{text}</MarkdownContent>
-        {!streaming && text && <SpeakButton text={text} />}
+        {!streaming && text && <SpeakButton text={text} voice={ttsVoice} speed={ttsSpeed} volume={ttsVolume} />}
       </div>
     </motion.div>
   );
 }
 
-function SpeakButton({ text }: { text: string }) {
+function SpeakButton({ text, voice, speed, volume }: { text: string; voice: string; speed: number; volume: number }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -547,7 +568,7 @@ function SpeakButton({ text }: { text: string }) {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voice, speed }),
       });
       if (!res.ok) throw new Error(await res.text());
       const blob = await res.blob();
@@ -555,15 +576,14 @@ function SpeakButton({ text }: { text: string }) {
       const audio = new Audio();
       audio.preload = "auto";
       audio.src = url;
+      audio.volume = Math.max(0, Math.min(1, volume));
       audioRef.current = audio;
       const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
       audio.onended = cleanup;
       audio.onerror = cleanup;
-      // Wait until the whole clip is buffered, then play from sample 0.
       await new Promise<void>((resolve, reject) => {
         audio.oncanplaythrough = () => resolve();
         audio.onerror = () => reject(new Error("Audio failed to load"));
-        // Safety net if canplaythrough never fires.
         setTimeout(resolve, 4000);
       });
       audio.currentTime = 0;
@@ -584,6 +604,67 @@ function SpeakButton({ text }: { text: string }) {
       {playing ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
       {playing ? "Stop" : "Read aloud"}
     </button>
+  );
+}
+
+function ImageGenBubble() {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
+      <HolaLogo size={32} className="mt-0.5 shrink-0" />
+      <div className="flex items-center gap-3 py-2">
+        <svg width="56" height="56" viewBox="0 0 56 56" className="text-primary" aria-label="Painting your image">
+          <circle
+            cx="28"
+            cy="28"
+            r="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray="113"
+            style={{ animation: "hola-brush-stroke 1.6s ease-in-out infinite" }}
+          />
+          <g style={{ animation: "hola-brush-orbit 1.6s linear infinite", transformOrigin: "28px 28px" }}>
+            <g transform="translate(46 28)">
+              <rect x="-3" y="-1.5" width="10" height="3" rx="1.5" fill="currentColor" />
+              <path d="M7 -3 L13 0 L7 3 Z" fill="currentColor" />
+            </g>
+          </g>
+        </svg>
+        <span className="text-sm text-muted-foreground">Painting your image…</span>
+      </div>
+    </motion.div>
+  );
+}
+
+function DiagramGenBubble() {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
+      <HolaLogo size={32} className="mt-0.5 shrink-0" />
+      <div className="flex items-center gap-3 py-2">
+        <svg width="72" height="56" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching your diagram">
+          <line x1="16" y1="16" x2="40" y2="16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <line x1="40" y1="16" x2="40" y2="40" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <line x1="16" y1="16" x2="40" y2="40" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
+            <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
+          </line>
+          <g style={{ animation: "hola-shape-float-a 2.2s ease-in-out infinite" }}>
+            <polygon points="16,10 22,20 10,20" fill="currentColor" opacity="0.9" />
+          </g>
+          <g style={{ animation: "hola-shape-float-b 2.4s ease-in-out infinite" }}>
+            <rect x="34" y="10" width="12" height="12" rx="1.5" fill="currentColor" opacity="0.9" />
+          </g>
+          <g style={{ animation: "hola-shape-float-c 2.6s ease-in-out infinite" }}>
+            <circle cx="40" cy="40" r="6" fill="currentColor" opacity="0.9" />
+          </g>
+        </svg>
+        <span className="text-sm text-muted-foreground">Sketching your diagram…</span>
+      </div>
+    </motion.div>
   );
 }
 

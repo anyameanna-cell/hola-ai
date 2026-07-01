@@ -6,6 +6,9 @@ export type ThemeName = "default" | "fire" | "water" | "forest";
 export type ThemeMode = "light" | "dark";
 export type FontFamily = "sans" | "serif" | "mono";
 export type FontSize = "small" | "medium" | "large" | "xlarge";
+export type MessageLength = "short" | "medium" | "long";
+export type Behavior = "ai" | "human" | "dramatic" | "normal" | "professional";
+export type TtsVoice = "shimmer" | "nova" | "sage" | "coral" | "alloy";
 
 export interface ThemePrefs {
   theme: ThemeName;
@@ -13,6 +16,11 @@ export interface ThemePrefs {
   fontFamily: FontFamily;
   fontSize: FontSize;
   aiCanRename: boolean;
+  messageLength: MessageLength;
+  behavior: Behavior;
+  ttsVoice: TtsVoice;
+  ttsSpeed: number;
+  ttsVolume: number;
 }
 
 const DEFAULTS: ThemePrefs = {
@@ -21,6 +29,11 @@ const DEFAULTS: ThemePrefs = {
   fontFamily: "sans",
   fontSize: "medium",
   aiCanRename: true,
+  messageLength: "medium",
+  behavior: "normal",
+  ttsVoice: "shimmer",
+  ttsSpeed: 1.0,
+  ttsVolume: 1.0,
 };
 
 interface Ctx extends ThemePrefs {
@@ -29,6 +42,11 @@ interface Ctx extends ThemePrefs {
   setFontFamily: (f: FontFamily) => void;
   setFontSize: (s: FontSize) => void;
   setAiCanRename: (v: boolean) => void;
+  setMessageLength: (v: MessageLength) => void;
+  setBehavior: (v: Behavior) => void;
+  setTtsVoice: (v: TtsVoice) => void;
+  setTtsSpeed: (v: number) => void;
+  setTtsVolume: (v: number) => void;
   applyPrefs: (p: Partial<ThemePrefs>) => void;
 }
 
@@ -68,23 +86,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyToDom(stored);
   }, []);
 
-  // Load from profile (roams across devices)
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("theme, theme_mode, font_family, font_size, ai_can_rename")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("theme, theme_mode, font_family, font_size, ai_can_rename, message_length, behavior, tts_voice, tts_speed, tts_volume" as any)
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled || !data) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = data as any;
         const merged: ThemePrefs = {
-          theme: (data.theme as ThemeName) ?? DEFAULTS.theme,
-          mode: (data.theme_mode as ThemeMode) ?? DEFAULTS.mode,
-          fontFamily: (data.font_family as FontFamily) ?? DEFAULTS.fontFamily,
-          fontSize: (data.font_size as FontSize) ?? DEFAULTS.fontSize,
-          aiCanRename: data.ai_can_rename ?? DEFAULTS.aiCanRename,
+          theme: (d.theme as ThemeName) ?? DEFAULTS.theme,
+          mode: (d.theme_mode as ThemeMode) ?? DEFAULTS.mode,
+          fontFamily: (d.font_family as FontFamily) ?? DEFAULTS.fontFamily,
+          fontSize: (d.font_size as FontSize) ?? DEFAULTS.fontSize,
+          aiCanRename: d.ai_can_rename ?? DEFAULTS.aiCanRename,
+          messageLength: (d.message_length as MessageLength) ?? DEFAULTS.messageLength,
+          behavior: (d.behavior as Behavior) ?? DEFAULTS.behavior,
+          ttsVoice: (d.tts_voice as TtsVoice) ?? DEFAULTS.ttsVoice,
+          ttsSpeed: typeof d.tts_speed === "number" ? d.tts_speed : DEFAULTS.ttsSpeed,
+          ttsVolume: typeof d.tts_volume === "number" ? d.tts_volume : DEFAULTS.ttsVolume,
         };
         hydratedFromDb.current = true;
         setPrefs(merged);
@@ -105,7 +130,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         font_family: prefs.fontFamily,
         font_size: prefs.fontSize,
         ai_can_rename: prefs.aiCanRename,
-      }).eq("id", user.id).then(() => { /* noop */ });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        message_length: prefs.messageLength,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        behavior: prefs.behavior,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tts_voice: prefs.ttsVoice,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tts_speed: prefs.ttsSpeed,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tts_volume: prefs.ttsVolume,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any).eq("id", user.id).then(() => { /* noop */ });
     }
   }, [prefs, user?.id]);
 
@@ -116,6 +152,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setFontFamily: (fontFamily) => setPrefs((p) => ({ ...p, fontFamily })),
     setFontSize: (fontSize) => setPrefs((p) => ({ ...p, fontSize })),
     setAiCanRename: (aiCanRename) => setPrefs((p) => ({ ...p, aiCanRename })),
+    setMessageLength: (messageLength) => setPrefs((p) => ({ ...p, messageLength })),
+    setBehavior: (behavior) => setPrefs((p) => ({ ...p, behavior })),
+    setTtsVoice: (ttsVoice) => setPrefs((p) => ({ ...p, ttsVoice })),
+    setTtsSpeed: (ttsSpeed) => setPrefs((p) => ({ ...p, ttsSpeed })),
+    setTtsVolume: (ttsVolume) => setPrefs((p) => ({ ...p, ttsVolume })),
     applyPrefs: (patch) => setPrefs((p) => ({ ...p, ...patch })),
   };
 

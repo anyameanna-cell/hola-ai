@@ -12,7 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useTheme, type ThemeName, type FontFamily, type FontSize } from "@/components/ThemeProvider";
+import { Slider } from "@/components/ui/slider";
+import {
+  useTheme,
+  type ThemeName,
+  type FontFamily,
+  type FontSize,
+  type MessageLength,
+  type Behavior,
+  type TtsVoice,
+} from "@/components/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -38,6 +47,28 @@ const SIZES: { id: FontSize; label: string }[] = [
   { id: "xlarge", label: "XL" },
 ];
 
+const LENGTHS: { id: MessageLength; label: string }[] = [
+  { id: "short", label: "Short & simple" },
+  { id: "medium", label: "Medium" },
+  { id: "long", label: "Long & detailed" },
+];
+
+const BEHAVIORS: { id: Behavior; label: string }[] = [
+  { id: "ai", label: "AI" },
+  { id: "human", label: "More like human" },
+  { id: "dramatic", label: "Dramatic" },
+  { id: "normal", label: "Normal" },
+  { id: "professional", label: "Professional" },
+];
+
+const VOICES: { id: TtsVoice; label: string; hint: string }[] = [
+  { id: "shimmer", label: "Shimmer", hint: "Gentle, warm" },
+  { id: "nova", label: "Nova", hint: "Bright young woman" },
+  { id: "sage", label: "Sage", hint: "Soft, calm" },
+  { id: "coral", label: "Coral", hint: "Friendly, expressive" },
+  { id: "alloy", label: "Alloy", hint: "Neutral" },
+];
+
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
   return (
@@ -53,7 +84,12 @@ export function SettingsButton() {
 }
 
 function SettingsContent() {
-  const { theme, mode, fontFamily, fontSize, aiCanRename, setTheme, setMode, setFontFamily, setFontSize, setAiCanRename } = useTheme();
+  const {
+    theme, mode, fontFamily, fontSize, aiCanRename,
+    messageLength, behavior, ttsVoice, ttsSpeed, ttsVolume,
+    setTheme, setMode, setFontFamily, setFontSize, setAiCanRename,
+    setMessageLength, setBehavior, setTtsVoice, setTtsSpeed, setTtsVolume,
+  } = useTheme();
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
@@ -188,6 +224,59 @@ function SettingsContent() {
               <p className="text-xs text-muted-foreground">Hola can update conversation titles as the topic evolves.</p>
             </div>
             <Switch id="ai-rename" checked={aiCanRename} onCheckedChange={setAiCanRename} />
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <Label>Message length</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {LENGTHS.map((l) => (
+              <Button key={l.id} variant={messageLength === l.id ? "default" : "outline"} size="sm" onClick={() => setMessageLength(l.id)}>
+                {l.label}
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <Label>Behavior</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {BEHAVIORS.map((b) => (
+              <Button key={b.id} variant={behavior === b.id ? "default" : "outline"} size="sm" onClick={() => setBehavior(b.id)}>
+                {b.label}
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3 rounded-lg border p-3">
+          <Label>Read aloud voice</Label>
+          <div className="grid grid-cols-1 gap-1.5">
+            {VOICES.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setTtsVoice(v.id)}
+                className={cn(
+                  "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition",
+                  ttsVoice === v.id ? "border-primary bg-accent/40" : "border-border hover:border-muted-foreground/40",
+                )}
+              >
+                <span className="font-medium">{v.label}</span>
+                <span className="text-xs text-muted-foreground">{v.hint}</span>
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Speed</span><span>{ttsSpeed.toFixed(2)}×</span>
+            </div>
+            <Slider min={0.5} max={1.75} step={0.05} value={[ttsSpeed]} onValueChange={([v]) => setTtsSpeed(v)} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Volume</span><span>{Math.round(ttsVolume * 100)}%</span>
+            </div>
+            <Slider min={0} max={1} step={0.05} value={[ttsVolume]} onValueChange={([v]) => setTtsVolume(v)} />
           </div>
         </section>
       </div>

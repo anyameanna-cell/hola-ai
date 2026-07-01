@@ -384,3 +384,26 @@
   animation: blink 1s steps(1) infinite;
   color: var(--color-primary);
 }
+
+/* Loading bubbles for image + diagram generation */
+@keyframes hola-brush-orbit {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes hola-brush-stroke {
+  0%   { stroke-dashoffset: 113; opacity: 0.9; }
+  60%  { stroke-dashoffset: 0;   opacity: 1;   }
+  100% { stroke-dashoffset: -113; opacity: 0;  }
+}
+@keyframes hola-shape-float-a {
+  0%,100% { transform: translate(0,0) rotate(0deg); }
+  50%     { transform: translate(2px,-3px) rotate(-8deg); }
+}
+@keyframes hola-shape-float-b {
+  0%,100% { transform: translate(0,0) rotate(0deg); }
+  50%     { transform: translate(-3px,2px) rotate(6deg); }
+}
+@keyframes hola-shape-float-c {
+  0%,100% { transform: translate(0,0); }
+  50%     { transform: translate(3px,-2px); }
+}
