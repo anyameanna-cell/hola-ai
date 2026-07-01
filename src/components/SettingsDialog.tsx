@@ -12,7 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useTheme, type ThemeName, type FontFamily, type FontSize } from "@/components/ThemeProvider";
+import { Slider } from "@/components/ui/slider";
+import {
+  useTheme,
+  type ThemeName,
+  type FontFamily,
+  type FontSize,
+  type MessageLength,
+  type Behavior,
+  type TtsVoice,
+} from "@/components/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -36,6 +45,28 @@ const SIZES: { id: FontSize; label: string }[] = [
   { id: "medium", label: "Medium" },
   { id: "large", label: "Large" },
   { id: "xlarge", label: "XL" },
+];
+
+const LENGTHS: { id: MessageLength; label: string }[] = [
+  { id: "short", label: "Short & simple" },
+  { id: "medium", label: "Medium" },
+  { id: "long", label: "Long & detailed" },
+];
+
+const BEHAVIORS: { id: Behavior; label: string }[] = [
+  { id: "ai", label: "AI" },
+  { id: "human", label: "More like human" },
+  { id: "dramatic", label: "Dramatic" },
+  { id: "normal", label: "Normal" },
+  { id: "professional", label: "Professional" },
+];
+
+const VOICES: { id: TtsVoice; label: string; hint: string }[] = [
+  { id: "shimmer", label: "Shimmer", hint: "Gentle, warm" },
+  { id: "nova", label: "Nova", hint: "Bright young woman" },
+  { id: "sage", label: "Sage", hint: "Soft, calm" },
+  { id: "coral", label: "Coral", hint: "Friendly, expressive" },
+  { id: "alloy", label: "Alloy", hint: "Neutral" },
 ];
 
 export function SettingsButton() {
