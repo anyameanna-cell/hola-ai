@@ -121,7 +121,7 @@ function ChatWindowInner({
   initialTitleAlreadySet: boolean;
 }) {
   const { user } = useAuth();
-  const { theme, mode, fontFamily, fontSize, aiCanRename } = useTheme();
+  const { theme, mode, fontFamily, fontSize, aiCanRename, messageLength, behavior, ttsVoice, ttsSpeed, ttsVolume } = useTheme();
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
