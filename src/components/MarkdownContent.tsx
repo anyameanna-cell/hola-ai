@@ -125,29 +125,67 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      {zoomed && (
-        <div
-          className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-6"
-          onClick={() => setZoomed(false)}
-        >
-          <button
-            type="button"
-            className="absolute top-4 right-4 p-2 rounded-full bg-card border"
-            onClick={() => setZoomed(false)}
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div
-            className="max-w-[95vw] max-h-[90vh] overflow-auto bg-card rounded-xl p-6 border [&_svg]:!max-w-none [&_svg]:!w-auto [&_svg]:!h-auto [&_svg]:!min-w-[600px]"
-            onClick={(e) => e.stopPropagation()}
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
-        </div>
-      )}
+      {zoomed && <MermaidZoomModal svg={svg} onClose={() => setZoomed(false)} />}
     </>
   );
 });
+
+function MermaidZoomModal({ svg, onClose }: { svg: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const dragging = useRef<{ x: number; y: number } | null>(null);
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = -e.deltaY * 0.0015;
+    setScale((s) => Math.min(5, Math.max(0.3, s + delta)));
+  };
+  const onMouseDown = (e: React.MouseEvent) => {
+    dragging.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragging.current) return;
+    setPos({ x: e.clientX - dragging.current.x, y: e.clientY - dragging.current.y });
+  };
+  const endDrag = () => { dragging.current = null; };
+  const reset = () => { setScale(1); setPos({ x: 0, y: 0 }); };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col" onClick={onClose}>
+      <div className="flex items-center justify-between p-3 border-b bg-card/80" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setScale((s) => Math.max(0.3, s - 0.25))} className="p-2 rounded-md border hover:bg-accent" aria-label="Zoom out"><ZoomOut className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setScale((s) => Math.min(5, s + 0.25))} className="p-2 rounded-md border hover:bg-accent" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+          <button type="button" onClick={reset} className="p-2 rounded-md border hover:bg-accent" aria-label="Reset"><RotateCcw className="h-4 w-4" /></button>
+          <span className="ml-2 text-xs text-muted-foreground tabular-nums">{Math.round(scale * 100)}%</span>
+        </div>
+        <button type="button" onClick={onClose} className="p-2 rounded-full border hover:bg-accent" aria-label="Close"><X className="h-5 w-5" /></button>
+      </div>
+      <div
+        className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        onClick={(e) => e.stopPropagation()}
+        onWheel={onWheel}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+      >
+        <div
+          className="w-full h-full flex items-center justify-center [&_svg]:!max-w-none [&_svg]:!max-h-none [&_svg]:!w-auto [&_svg]:!h-auto"
+          style={{
+            transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+            transformOrigin: "center center",
+            transition: dragging.current ? "none" : "transform 0.08s linear",
+          }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+      <div className="p-2 text-center text-xs text-muted-foreground border-t bg-card/60">
+        Scroll to zoom · Drag to pan · Buttons for precise control
+      </div>
+    </div>
+  );
+}
 
 function hash(s: string): number {
   let h = 0;
