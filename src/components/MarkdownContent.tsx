@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, Maximize2, X } from "lucide-react";
+import { Check, Copy, Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import mermaid from "mermaid";
 
 // Init mermaid exactly once for the page
