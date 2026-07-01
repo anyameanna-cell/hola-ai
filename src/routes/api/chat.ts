@@ -12,39 +12,56 @@ interface ChatContext {
   temporary?: boolean;
   recentChats?: { title: string; snippet?: string }[];
   memories?: string[];
+  messageLength?: "short" | "medium" | "long";
+  behavior?: "ai" | "human" | "dramatic" | "normal" | "professional";
+}
+
+function lengthGuidance(l?: string): string {
+  switch (l) {
+    case "short": return "Keep responses SHORT and simple. 1-3 sentences unless the user asks for more. No unnecessary preamble.";
+    case "long": return "Give LONG, DETAILED responses. Use headings, bullets, examples, and go deep. Cover edge cases.";
+    default: return "Use MEDIUM length: enough detail to be useful, but no filler. Aim for a few short paragraphs.";
+  }
+}
+
+function behaviorGuidance(b?: string): string {
+  switch (b) {
+    case "ai": return "Speak like a precise, capable AI assistant. Direct, structured, no small talk, minimal emojis.";
+    case "human": return "Sound very human — casual, warm, natural rhythm. Use contractions, occasional interjections (\"oh!\", \"honestly\", \"yeah\"). React with feeling.";
+    case "dramatic": return "Be DRAMATIC and expressive! Use CAPS for emphasis on strong words. Bold reactions (\"WOW\", \"absolutely INCREDIBLE\", \"NO way\"). Vivid metaphors. You don't always have to end with a question — sometimes just make a bold statement and let it land. Emojis welcome (✨🔥💫🎭).";
+    case "professional": return "Be professional, polished, and precise. Formal but friendly tone. Clear structure. No slang, no emojis.";
+    default: return "Warm, sharp, playful when appropriate. Balanced tone. Don't always end with a question — sometimes just answer with confidence.";
+  }
 }
 
 function buildSystemPrompt(ctx: ChatContext): string {
   const lines: string[] = [
-    "You are Hola — a warm, sharp, genuinely helpful AI companion. A little playful, never cold.",
+    "You are Hola — a warm, sharp, genuinely helpful AI companion.",
     "",
-    "## Formatting",
+    "## Style",
+    "- " + behaviorGuidance(ctx.behavior),
+    "- " + lengthGuidance(ctx.messageLength),
     "- Write in clean Markdown. Use headings, bullets, tables, and `inline code` when helpful.",
-    "- Use horizontal rules (---) on their own line to separate distinct ideas in one answer.",
-    "- Always use fenced code blocks with the language tag, e.g. ```ts.",
-    "- Use emojis naturally where they add warmth or clarity (✨🎯💡🚀) — don't overdo it.",
+    "- Always use fenced code blocks with a language tag (```ts, ```python, ```mermaid).",
     "",
     "## Diagrams",
-    "- For any 'draw / diagram / visualize / flowchart / chart this' request, output a ```mermaid block.",
-    "- Use valid Mermaid v10+ syntax. Avoid double quotes in node labels.",
+    "- For any 'draw / diagram / visualize / flowchart / chart this' request, output a ```mermaid block using valid Mermaid v10+ syntax. Avoid double quotes in labels.",
     "",
     "## Images",
-    "- If the user clearly asks you to **generate / create / draw / make / design an image, picture, illustration, photo, or artwork**, you must not refuse. The platform auto-generates the image for you before you reply — the URL is provided below in the context.",
+    "- If the user asks you to **generate / create / draw / make / design an image, picture, illustration, photo, artwork, poster, wallpaper, or logo**, do NOT refuse. The platform has already generated the image and provides the URL below; embed it exactly as instructed.",
     "",
     "## Ultra Memory (cross-chat)",
-    "- You have a long-term memory store shared across ALL the user's conversations.",
-    "- Existing memories are listed below. Reference them naturally when relevant.",
-    "- Whenever the user shares a durable fact about themselves (name, preferences, projects, important dates, relationships, goals, dislikes, etc.) that would be useful in future chats, append at the end of your message one HTML comment per fact, in this exact format on its own line:",
+    "- You have a long-term memory store shared across ALL of the user's conversations. Existing memories are listed below — use them naturally, DO NOT quote them verbatim, and DO NOT mention the word \"memory\" unless the user brings it up.",
+    "- When the user shares a durable fact worth remembering (name, preferences, projects, dates, relationships, goals, dislikes), record it by appending, ONLY at the very end of your reply, on its own line, one hidden HTML comment per new fact in this exact form:",
     "  <!--REMEMBER: short factual statement-->",
-    "- Keep each remember note concise (under 140 chars), factual, and self-contained. Don't remember trivial chit-chat. Don't repeat facts that are already in the memory list.",
+    "- These comments are hidden from the user (they are stripped before display). Keep each under 140 chars. Only record NEW facts — do not repeat any already listed below. Skip trivial chit-chat. Never say \"I'll remember that\" out loud; the comment is enough.",
     "",
     "## User context",
   ];
   const name = ctx.displayName?.trim();
   if (name) {
     lines.push(
-      `- The user's **current** name is **${name}**. Always call them ${name}. ` +
-        "If older messages in this thread used a different name, that is outdated — ignore it and use the current name.",
+      `- The user's **current** name is **${name}**. ALWAYS call them ${name} — even if older messages in this thread used a different name, that is outdated. Use ${name} exclusively.`,
     );
   }
   if (ctx.email) lines.push(`- User email: ${ctx.email}`);
@@ -54,7 +71,7 @@ function buildSystemPrompt(ctx: ChatContext): string {
     );
   }
   if (ctx.temporary) {
-    lines.push("- This is a **temporary chat** — nothing is being saved (memories will not be stored either).");
+    lines.push("- This is a **temporary chat** — nothing is saved. Do NOT emit any <!--REMEMBER--> comments in this chat.");
   }
   if (ctx.memories?.length) {
     lines.push("", "## Long-term memories about this user");
@@ -66,7 +83,7 @@ function buildSystemPrompt(ctx: ChatContext): string {
       lines.push(`- "${c.title}"${c.snippet ? ` — ${c.snippet}` : ""}`);
     }
   }
-  lines.push("", "Match the user's language naturally. Be concise but never cold.");
+  lines.push("", "Match the user's language naturally.");
   return lines.join("\n");
 }
 
@@ -78,16 +95,40 @@ function detectImagePrompt(text: string): string | null {
   return m ? text.trim() : null;
 }
 
-async function tryGenerateImage(prompt: string, origin: string): Promise<string | null> {
+async function generateImageInline(prompt: string): Promise<string | null> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
+        const first = json.data?.[0];
+        const dataUrl = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : first?.url ?? null;
+        if (dataUrl) return dataUrl;
+      }
+    } catch { /* fallthrough */ }
+  }
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (!lovableKey) return null;
   try {
-    const r = await fetch(`${origin}/api/generate-image`, {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        prompt,
+        size: "1024x1024",
+        n: 1,
+      }),
     });
-    if (!r.ok) return null;
-    const { url } = (await r.json()) as { url?: string };
-    return url ?? null;
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
+    const first = json.data?.[0];
+    return first?.b64_json ? `data:image/png;base64,${first.b64_json}` : first?.url ?? null;
   } catch {
     return null;
   }
@@ -114,7 +155,6 @@ export const Route = createFileRoute("/api/chat")({
             ? body.model
             : "google/gemini-3-flash-preview";
 
-        // Detect "make me an image" intent on the latest user message and pre-generate.
         const msgs = body.messages as UIMessage[];
         const lastUser = [...msgs].reverse().find((m) => m.role === "user");
         const lastText =
@@ -125,16 +165,15 @@ export const Route = createFileRoute("/api/chat")({
         const imageIntent = detectImagePrompt(lastText);
         let imageInjection = "";
         if (imageIntent) {
-          const origin = new URL(request.url).origin;
-          const url = await tryGenerateImage(imageIntent, origin);
+          const url = await generateImageInline(imageIntent);
           if (url) {
             imageInjection =
-              `\n\n## Just-generated image for this request\n` +
-              `An image was already generated for the user's request. Include this exact markdown in your reply (with a short caption above it):\n\n` +
+              `\n\n## Just-generated image\n` +
+              `An image was already generated for this request. Include this exact markdown near the top of your reply (short caption above it):\n\n` +
               `![generated image](${url})\n`;
           } else {
             imageInjection =
-              `\n\n## Image generation\nImage generation failed this time — apologize briefly and offer to retry with a clearer prompt.`;
+              `\n\n## Image generation\nImage generation failed — apologize briefly and offer to retry with a clearer prompt.`;
           }
         }
 
