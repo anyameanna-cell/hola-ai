@@ -74,37 +74,52 @@ export type Database = {
         Row: {
           ai_can_rename: boolean
           avatar_url: string | null
+          behavior: string
           created_at: string
           display_name: string | null
           font_family: string
           font_size: string
           id: string
+          message_length: string
           theme: string
           theme_mode: string
+          tts_speed: number
+          tts_voice: string
+          tts_volume: number
           updated_at: string
         }
         Insert: {
           ai_can_rename?: boolean
           avatar_url?: string | null
+          behavior?: string
           created_at?: string
           display_name?: string | null
           font_family?: string
           font_size?: string
           id: string
+          message_length?: string
           theme?: string
           theme_mode?: string
+          tts_speed?: number
+          tts_voice?: string
+          tts_volume?: number
           updated_at?: string
         }
         Update: {
           ai_can_rename?: boolean
           avatar_url?: string | null
+          behavior?: string
           created_at?: string
           display_name?: string | null
           font_family?: string
           font_size?: string
           id?: string
+          message_length?: string
           theme?: string
           theme_mode?: string
+          tts_speed?: number
+          tts_voice?: string
+          tts_volume?: number
           updated_at?: string
         }
         Relationships: []
