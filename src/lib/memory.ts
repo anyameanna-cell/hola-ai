@@ -1,7 +1,11 @@
 const REMEMBER_COMMENT_RE = /<!--\s*REMEMBER:\s*([\s\S]*?)\s*-->/gi;
 
 export function stripMemoryComments(text: string): string {
-  return text.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+  return text
+    .replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "")
+    .replace(/<!--\s*REMEMBER:[\s\S]*$/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
 }
 
 export function normalizeMemory(content: string): string {

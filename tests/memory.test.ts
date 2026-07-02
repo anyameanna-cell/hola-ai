@@ -9,6 +9,10 @@ describe("Ultra Memory", () => {
     expect(visible).not.toContain("<!--");
   });
 
+  it("also hides partially streamed REMEMBER comments", () => {
+    expect(stripMemoryComments("Okay.\n<!--REMEMBER: still streaming")).toBe("Okay.");
+  });
+
   it("extracts and dedupes hidden memory comments", () => {
     expect(extractMemoryComments("<!--REMEMBER: Likes blue.-->\n<!-- remember: likes blue -->")).toEqual(["Likes blue."]);
   });
