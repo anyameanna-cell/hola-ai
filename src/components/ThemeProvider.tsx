@@ -96,7 +96,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
+        if (!data) {
+          hydratedFromDb.current = true;
+          return;
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const d = data as any;
         const merged: ThemePrefs = {
@@ -124,7 +128,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
     } catch { /* noop */ }
     if (user && hydratedFromDb.current) {
-      supabase.from("profiles").update({
+      supabase.from("profiles").upsert({
+        id: user.id,
         theme: prefs.theme,
         theme_mode: prefs.mode,
         font_family: prefs.fontFamily,
@@ -140,6 +145,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         tts_speed: prefs.ttsSpeed,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tts_volume: prefs.ttsVolume,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).eq("id", user.id).then(() => { /* noop */ });
     }

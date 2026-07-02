@@ -150,7 +150,7 @@ function ChatWindowInner({
     };
     const loadMemories = () => {
       supabase.from("memories").select("id, content").eq("user_id", user.id)
-        .order("created_at", { ascending: false }).limit(80)
+        .order("created_at", { ascending: false }).limit(100)
         .then(({ data }) => {
           if (cancelled) return;
           const rows = data ?? [];
