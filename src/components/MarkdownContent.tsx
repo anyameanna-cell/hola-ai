@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Copy, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import mermaid from "mermaid";
 
 // Init mermaid exactly once for the page
@@ -134,6 +134,7 @@ function MermaidZoomModal({ svg, onClose }: { svg: string; onClose: () => void }
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const dragging = useRef<{ x: number; y: number } | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -149,6 +150,20 @@ function MermaidZoomModal({ svg, onClose }: { svg: string; onClose: () => void }
   };
   const endDrag = () => { dragging.current = null; };
   const reset = () => { setScale(1); setPos({ x: 0, y: 0 }); };
+  const pan = (dx: number, dy: number) => setPos((p) => ({ x: p.x + dx, y: p.y + dy }));
+
+  useEffect(() => { viewportRef.current?.focus(); }, []);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") onClose();
+    else if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale((s) => Math.min(5, s + 0.25)); }
+    else if (e.key === "-" || e.key === "_") { e.preventDefault(); setScale((s) => Math.max(0.3, s - 0.25)); }
+    else if (e.key === "0") { e.preventDefault(); reset(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); pan(60, 0); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); pan(-60, 0); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); pan(0, 60); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); pan(0, -60); }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col" onClick={onClose}>
@@ -159,12 +174,23 @@ function MermaidZoomModal({ svg, onClose }: { svg: string; onClose: () => void }
           <button type="button" onClick={reset} className="p-2 rounded-md border hover:bg-accent" aria-label="Reset"><RotateCcw className="h-4 w-4" /></button>
           <span className="ml-2 text-xs text-muted-foreground tabular-nums">{Math.round(scale * 100)}%</span>
         </div>
+        <div className="flex items-center gap-1" aria-label="Pan controls">
+          <button type="button" onClick={() => pan(60, 0)} className="p-2 rounded-md border hover:bg-accent" aria-label="Pan left"><ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={() => pan(-60, 0)} className="p-2 rounded-md border hover:bg-accent" aria-label="Pan right"><ArrowRight className="h-4 w-4" /></button>
+          <button type="button" onClick={() => pan(0, 60)} className="p-2 rounded-md border hover:bg-accent" aria-label="Pan up"><ArrowUp className="h-4 w-4" /></button>
+          <button type="button" onClick={() => pan(0, -60)} className="p-2 rounded-md border hover:bg-accent" aria-label="Pan down"><ArrowDown className="h-4 w-4" /></button>
+        </div>
         <button type="button" onClick={onClose} className="p-2 rounded-full border hover:bg-accent" aria-label="Close"><X className="h-5 w-5" /></button>
       </div>
       <div
+        ref={viewportRef}
+        tabIndex={0}
+        role="application"
+        aria-label="Full-size diagram. Use plus and minus to zoom, arrow keys to pan, zero to reset, and escape to close."
         className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing select-none"
         onClick={(e) => e.stopPropagation()}
         onWheel={onWheel}
+        onKeyDown={onKeyDown}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={endDrag}
@@ -181,7 +207,7 @@ function MermaidZoomModal({ svg, onClose }: { svg: string; onClose: () => void }
         />
       </div>
       <div className="p-2 text-center text-xs text-muted-foreground border-t bg-card/60">
-        Scroll to zoom · Drag to pan · Buttons for precise control
+        Scroll or +/- to zoom · Drag, arrows, or pan buttons to move · 0 resets
       </div>
     </div>
   );
