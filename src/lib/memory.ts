@@ -4,6 +4,7 @@ export function stripMemoryComments(text: string): string {
   return text
     .replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "")
     .replace(/<!--\s*REMEMBER:[\s\S]*$/gi, "")
+    .replace(/[ \t]*\n[ \t]*\n+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trimEnd();
 }
