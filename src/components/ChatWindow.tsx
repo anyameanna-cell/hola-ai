@@ -40,7 +40,7 @@ function partsToText(parts: UIMessage["parts"]): string {
 
 // Hide the hidden <!--REMEMBER: ...--> notes from what the user sees.
 function stripMemoryComments(s: string): string {
-  return s.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+  const complete = s.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, ""); return complete.replace(/<!--\s*REMEMBER:[\s\S]*$/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 function detectImageIntent(s: string): boolean {
@@ -321,6 +321,7 @@ function ChatWindowInner({
       const { data, error } = await supabase.from("memories").insert(rows).select("id, content");
       if (!error && data) {
         setMemories((prev) => [...data.map((d) => d.content), ...prev]);
+        window.dispatchEvent(new CustomEvent("hola:memory-changed"));
         for (const d of data) savedMemoryIds.current.add(d.id);
       }
     })();

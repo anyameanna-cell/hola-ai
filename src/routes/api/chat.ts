@@ -75,7 +75,7 @@ function buildSystemPrompt(ctx: ChatContext): string {
   }
   if (ctx.memories?.length) {
     lines.push("", "## Long-term memories about this user");
-    for (const m of ctx.memories.slice(0, 60)) lines.push(`- ${m}`);
+    for (const m of ctx.memories.slice(0, 100)) lines.push(`- ${m}`);
   }
   if (ctx.recentChats?.length) {
     lines.push("", "## Recent past conversations (for continuity)");
