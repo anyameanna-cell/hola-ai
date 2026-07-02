@@ -12,6 +12,7 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { generateThreadTitle } from "@/lib/title.functions";
+import { extractMemoryComments, extractUserMemoryRequests, getFreshMemories, stripMemoryComments } from "@/lib/memory";
 import { toast } from "sonner";
 
 interface ChatWindowProps {
@@ -36,11 +37,6 @@ function rowsToUIMessages(rows: DbMessage[]): UIMessage[] {
 
 function partsToText(parts: UIMessage["parts"]): string {
   return parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-}
-
-// Hide the hidden <!--REMEMBER: ...--> notes from what the user sees.
-function stripMemoryComments(s: string): string {
-  const complete = s.replace(/<!--\s*REMEMBER:[\s\S]*?-->/gi, ""); return complete.replace(/<!--\s*REMEMBER:[\s\S]*$/gi, "").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 function detectImageIntent(s: string): boolean {
@@ -309,12 +305,7 @@ function ChatWindowInner({
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
     const text = partsToText(last.parts);
-    const matches = [...text.matchAll(/<!--\s*REMEMBER:\s*([^>]+?)\s*-->/gi)].map((m) =>
-      m[1].replace(/\s+/g, " ").trim(),
-    ).filter(Boolean);
-    if (matches.length === 0) return;
-    const existing = new Set(memories.map((m) => m.toLowerCase()));
-    const fresh = matches.filter((m) => !existing.has(m.toLowerCase()));
+    const fresh = getFreshMemories(memories, extractMemoryComments(text));
     if (fresh.length === 0) return;
     (async () => {
       const rows = fresh.map((content) => ({ user_id: user.id, content: content.slice(0, 500) }));
@@ -381,6 +372,16 @@ function ChatWindowInner({
     const text = input.trim();
     if ((!text && attachments.length === 0) || status === "streaming" || status === "submitted") return;
     if (!user) return;
+    const userFacts = extractUserMemoryRequests(text);
+    if (!temporary && userFacts.length > 0) {
+      const fresh = getFreshMemories(memories, userFacts);
+      if (fresh.length > 0) {
+        supabase.from("memories").insert(fresh.map((content) => ({ user_id: user.id, content }))).then(({ data }) => {
+          if (data) window.dispatchEvent(new CustomEvent("hola:memory-changed"));
+        });
+        setMemories((prev) => [...fresh, ...prev]);
+      }
+    }
     setInput("");
     const atts = attachments;
     setAttachments([]);
@@ -582,6 +583,7 @@ function SpeakButton({ text, voice, speed, volume }: { text: string; voice: stri
       const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
       audio.onended = cleanup;
       audio.onerror = cleanup;
+      audio.load();
       await new Promise<void>((resolve, reject) => {
         audio.oncanplaythrough = () => resolve();
         audio.onerror = () => reject(new Error("Audio failed to load"));
@@ -599,8 +601,9 @@ function SpeakButton({ text, voice, speed, volume }: { text: string; voice: stri
     <button
       type="button"
       onClick={toggle}
-      className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition"
+      className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 focus:opacity-100 transition"
       title={playing ? "Stop" : "Read aloud"}
+      aria-label={playing ? "Stop read aloud" : "Read aloud"}
     >
       {playing ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
       {playing ? "Stop" : "Read aloud"}
@@ -612,8 +615,8 @@ function ImageGenBubble() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
-      <div className="flex items-center gap-3 py-2">
-        <svg width="56" height="56" viewBox="0 0 56 56" className="text-primary" aria-label="Painting your image">
+      <div className="w-full max-w-[520px] aspect-square rounded-xl border bg-card/70 flex flex-col items-center justify-center gap-4 shadow-sm">
+        <svg width="112" height="112" viewBox="0 0 56 56" className="text-primary" aria-label="Painting your image">
           <circle
             cx="28"
             cy="28"
@@ -642,8 +645,8 @@ function DiagramGenBubble() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
-      <div className="flex items-center gap-3 py-2">
-        <svg width="72" height="56" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching your diagram">
+      <div className="w-full max-w-[520px] aspect-[4/3] rounded-xl border bg-card/70 flex flex-col items-center justify-center gap-4 shadow-sm">
+        <svg width="144" height="112" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching your diagram">
           <line x1="16" y1="16" x2="40" y2="16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
             <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
           </line>
