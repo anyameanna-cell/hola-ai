@@ -254,15 +254,45 @@ const CodeBlock = memo(function CodeBlock({ language, code }: { language: string
 
 function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
   const [open, setOpen] = useState(false);
+  const download = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (alt || "hola-image").replace(/[^\w.-]+/g, "_") + ".png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      const a = document.createElement("a");
+      a.href = src; a.download = "hola-image.png"; a.target = "_blank";
+      a.click();
+    }
+  };
   return (
     <>
-      <img
-        src={src}
-        alt={alt ?? ""}
-        loading="lazy"
-        onClick={() => setOpen(true)}
-        className="my-3 max-w-full rounded-lg border cursor-zoom-in"
-      />
+      <span className="relative inline-block my-3 max-w-full">
+        <img
+          src={src}
+          alt={alt ?? ""}
+          loading="lazy"
+          onClick={() => setOpen(true)}
+          className="max-w-full rounded-lg border cursor-zoom-in block"
+        />
+        <button
+          type="button"
+          onClick={download}
+          aria-label="Download image"
+          title="Download image"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-background/85 backdrop-blur border shadow hover:bg-background transition"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </button>
+      </span>
       {open && (
         <div
           className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-6"
@@ -275,6 +305,15 @@ function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
             aria-label="Close"
           >
             <X className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            className="absolute top-4 right-16 p-2 rounded-full bg-card border"
+            onClick={download}
+            aria-label="Download image"
+            title="Download"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           </button>
           <img src={src} alt={alt ?? ""} className="max-w-[95vw] max-h-[90vh] rounded-xl" onClick={(e) => e.stopPropagation()} />
         </div>
