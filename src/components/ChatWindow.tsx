@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { motion, AnimatePresence } from "framer-motion";
@@ -516,7 +516,7 @@ function ChatWindowInner({
   );
 }
 
-function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume }: { message: UIMessage; streaming: boolean; ttsVoice: string; ttsSpeed: number; ttsVolume: number }) {
+const MessageBubble = memo(function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume }: { message: UIMessage; streaming: boolean; ttsVoice: string; ttsSpeed: number; ttsVolume: number }) {
   const isUser = message.role === "user";
   const rawText = partsToText(message.parts);
   const text = isUser ? rawText : stripMemoryComments(rawText);
@@ -552,7 +552,15 @@ function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume }: { 
       </div>
     </motion.div>
   );
-}
+}, (prev, next) => {
+  // Re-render only when content, streaming state, or TTS settings actually change.
+  if (prev.streaming !== next.streaming) return false;
+  if (prev.ttsVoice !== next.ttsVoice || prev.ttsSpeed !== next.ttsSpeed || prev.ttsVolume !== next.ttsVolume) return false;
+  if (prev.message.id !== next.message.id) return false;
+  const a = partsToText(prev.message.parts);
+  const b = partsToText(next.message.parts);
+  return a === b;
+});
 
 function SpeakButton({ text, voice, speed, volume }: { text: string; voice: string; speed: number; volume: number }) {
   const [playing, setPlaying] = useState(false);
