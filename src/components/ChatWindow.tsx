@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
+import { HolaLoader } from "@/components/HolaLoader";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ export function ChatWindow({ threadId, temporary = false }: ChatWindowProps) {
   if (initialMessages === null) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <HolaLogo size={48} className="opacity-60 animate-pulse" />
+        <HolaLoader label="Loading your chat…" />
       </div>
     );
   }

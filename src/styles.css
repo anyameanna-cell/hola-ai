@@ -407,3 +407,56 @@
   0%,100% { transform: translate(0,0); }
   50%     { transform: translate(3px,-2px); }
 }
+
+/* =============== Hola loader (jumping dots + icon + pink dust) =============== */
+.hola-loader-bg {
+  background:
+    radial-gradient(ellipse at 50% 65%, rgba(236, 72, 153, 0.35), transparent 55%),
+    radial-gradient(ellipse at 50% 90%, rgba(236, 72, 153, 0.55), transparent 40%),
+    linear-gradient(180deg, #1a0b2e 0%, #2a0f4a 50%, #1a0b2e 100%);
+}
+.hola-loader-dust {
+  position: absolute;
+  bottom: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  height: 60%;
+  background: radial-gradient(ellipse at center, rgba(255, 100, 200, 0.45), rgba(255, 100, 200, 0) 60%);
+  filter: blur(28px);
+  animation: hola-dust-pulse 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.hola-loader-dust-2 {
+  bottom: -10%;
+  width: 55%;
+  height: 40%;
+  background: radial-gradient(ellipse at center, rgba(255, 60, 180, 0.6), rgba(255, 60, 180, 0) 70%);
+  animation-duration: 2.2s;
+  animation-delay: 0.5s;
+}
+@keyframes hola-dust-pulse {
+  0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;    transform: translateX(-50%) scale(1.08); }
+}
+.hola-loader-icon {
+  animation: hola-icon-float 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 24px rgba(255, 100, 200, 0.55));
+}
+@keyframes hola-icon-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.hola-loader-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #ffb6e6 0%, #ff5eb0 100%);
+  box-shadow: 0 0 12px rgba(255, 100, 200, 0.7);
+  animation: hola-dot-jump 1.1s ease-in-out infinite;
+}
+@keyframes hola-dot-jump {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.85; }
+  30%           { transform: translateY(-14px); opacity: 1; }
+}
+
