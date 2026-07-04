@@ -43,26 +43,28 @@ function enrichTooltips(host: HTMLElement) {
 const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: string; streaming?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   const id = useMemo(() => `mmd-${Math.abs(hash(code))}`, [code]);
 
   useEffect(() => {
     if (streaming) return; // wait until streaming finishes to render
+    setSvg(null);
+    setFailed(false);
     ensureMermaid();
     let cancelled = false;
     (async () => {
       try {
-        // Pre-validate to avoid mermaid injecting its bomb error SVG into the DOM
         const ok = await mermaid.parse(code, { suppressErrors: true });
         if (!ok) {
-          if (!cancelled) setSvg(null);
+          if (!cancelled) setFailed(true);
           return;
         }
         const { svg } = await mermaid.render(id, code);
         if (cancelled) return;
         setSvg(svg);
       } catch {
-        if (!cancelled) setSvg(null);
+        if (!cancelled) setFailed(true);
       }
     })();
     return () => { cancelled = true; };
@@ -72,10 +74,12 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
     if (svg && ref.current) enrichTooltips(ref.current);
   }, [svg]);
 
-  if (streaming) {
+  // Show animated placeholder while streaming OR while mermaid is rendering asynchronously
+  // (prevents a flash of raw code between "streaming done" and "svg ready").
+  if (streaming || (!svg && !failed)) {
     return (
-      <div className="my-3 rounded-lg border bg-card p-4 flex items-center gap-3">
-        <svg width="72" height="56" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching diagram">
+      <div className="my-3 rounded-xl border bg-card p-5 flex flex-col items-center justify-center gap-3 min-h-[180px]">
+        <svg width="96" height="72" viewBox="0 0 72 56" className="text-primary" aria-label="Sketching diagram">
           <line x1="16" y1="16" x2="40" y2="16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3">
             <animate attributeName="stroke-dashoffset" values="0;-12" dur="1.4s" repeatCount="indefinite" />
           </line>
@@ -95,12 +99,12 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
             <circle cx="40" cy="40" r="6" fill="currentColor" opacity="0.9" />
           </g>
         </svg>
-        <span className="text-sm text-muted-foreground italic">Generating diagram…</span>
+        <span className="text-sm text-muted-foreground italic">Sketching diagram…</span>
       </div>
     );
   }
 
-  if (!svg) {
+  if (failed) {
     return (
       <pre className="my-3 rounded-lg border bg-muted/40 p-3 text-xs overflow-auto whitespace-pre-wrap">
         <code>{code}</code>
@@ -108,6 +112,7 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
     );
   }
 
+  if (!svg) return null;
   return (
     <>
       <div
