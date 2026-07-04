@@ -112,6 +112,7 @@ const MermaidBlock = memo(function MermaidBlock({ code, streaming }: { code: str
     );
   }
 
+  if (!svg) return null;
   return (
     <>
       <div
