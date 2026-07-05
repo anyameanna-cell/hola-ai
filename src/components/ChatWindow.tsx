@@ -448,7 +448,7 @@ function ChatWindowInner({
               ))}
             </div>
           )}
-          <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition">
+          <div className="chat-composer relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition">
             <Textarea
               ref={textareaRef}
               value={input}
