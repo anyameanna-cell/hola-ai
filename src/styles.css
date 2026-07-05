@@ -317,7 +317,14 @@
 }
 
 /* Mermaid diagram polish */
-.mermaid-host svg { max-width: 100%; height: auto; }
+/* Let diagrams grow naturally; the .mermaid-host container scrolls when needed */
+.mermaid-host { max-width: 100%; }
+.mermaid-host svg { height: auto; max-width: none; }
+.mermaid-host .nodeLabel, .mermaid-host .edgeLabel { white-space: nowrap; }
+
+/* Chat composer: prevent layout shift while typing */
+.chat-composer { contain: layout style; }
+.chat-composer textarea { transition: none; }
 .mermaid-host .node:hover rect,
 .mermaid-host .node:hover circle,
 .mermaid-host .node:hover polygon,

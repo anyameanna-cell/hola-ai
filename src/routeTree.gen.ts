@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,7 +18,13 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppCThreadIdRouteImport } from './routes/_app.c.$threadId'
+import { Route as AppAdminInboxRouteImport } from './routes/_app.admin.inbox'
 
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -57,23 +64,32 @@ const AppCThreadIdRoute = AppCThreadIdRouteImport.update({
   path: '/c/$threadId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminInboxRoute = AppAdminInboxRouteImport.update({
+  id: '/admin/inbox',
+  path: '/admin/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
 }
 export interface FileRoutesById {
@@ -81,10 +97,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/_app/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/_app/admin/inbox': typeof AppAdminInboxRoute
   '/_app/c/$threadId': typeof AppCThreadIdRoute
 }
 export interface FileRouteTypes {
@@ -92,29 +110,35 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/contact'
     | '/chat'
     | '/api/chat'
     | '/api/generate-image'
     | '/api/tts'
+    | '/admin/inbox'
     | '/c/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/contact'
     | '/chat'
     | '/api/chat'
     | '/api/generate-image'
     | '/api/tts'
+    | '/admin/inbox'
     | '/c/$threadId'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/auth'
+    | '/contact'
     | '/_app/chat'
     | '/api/chat'
     | '/api/generate-image'
     | '/api/tts'
+    | '/_app/admin/inbox'
     | '/_app/c/$threadId'
   fileRoutesById: FileRoutesById
 }
@@ -122,6 +146,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ContactRoute: typeof ContactRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiTtsRoute: typeof ApiTtsRoute
@@ -129,6 +154,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -185,16 +217,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCThreadIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/inbox': {
+      id: '/_app/admin/inbox'
+      path: '/admin/inbox'
+      fullPath: '/admin/inbox'
+      preLoaderRoute: typeof AppAdminInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppChatRoute: typeof AppChatRoute
+  AppAdminInboxRoute: typeof AppAdminInboxRoute
   AppCThreadIdRoute: typeof AppCThreadIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppChatRoute: AppChatRoute,
+  AppAdminInboxRoute: AppAdminInboxRoute,
   AppCThreadIdRoute: AppCThreadIdRoute,
 }
 
@@ -204,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  ContactRoute: ContactRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiTtsRoute: ApiTtsRoute,
@@ -211,13 +253,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
