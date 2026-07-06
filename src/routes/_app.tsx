@@ -14,7 +14,6 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user, loading } = useAuth();
-  const { isAdmin } = useIsAdmin();
   if (loading) return <HolaLoader fullscreen label="Loading Hola…" />;
   if (!user) return <Navigate to="/auth" replace />;
 
@@ -32,11 +31,6 @@ function AppLayout() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {isAdmin && (
-                <Button asChild variant="ghost" size="sm" title="Admin inbox">
-                  <Link to="/admin/inbox"><ShieldCheck className="h-4 w-4 mr-1" /> Inbox</Link>
-                </Button>
-              )}
               <NotificationBell />
               <Button asChild variant="ghost" size="sm" title="Temporary chat (nothing saved)">
                 <Link to="/chat" search={{ temp: "1" }}>
