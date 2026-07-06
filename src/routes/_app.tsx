@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate, Outlet, Link } from "@tanstack/react-router";
-import { Ghost, Plus, ShieldCheck } from "lucide-react";
+import { Ghost, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -7,7 +7,6 @@ import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
