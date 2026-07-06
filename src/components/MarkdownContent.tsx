@@ -14,7 +14,7 @@ function ensureMermaid() {
     theme: dark ? "dark" : "default",
     securityLevel: "loose",
     fontFamily: "inherit",
-    flowchart: { useMaxWidth: true, htmlLabels: true },
+    flowchart: { useMaxWidth: false, htmlLabels: true, nodeSpacing: 60, rankSpacing: 70, padding: 12 },
   });
   mermaidInit = true;
 }
