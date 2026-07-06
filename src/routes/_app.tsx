@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate, Outlet, Link } from "@tanstack/react-router";
-import { Ghost, Plus, ShieldCheck } from "lucide-react";
+import { Ghost, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -7,7 +7,6 @@ import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -15,7 +14,6 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user, loading } = useAuth();
-  const { isAdmin } = useIsAdmin();
   if (loading) return <HolaLoader fullscreen label="Loading Hola…" />;
   if (!user) return <Navigate to="/auth" replace />;
 
@@ -33,11 +31,6 @@ function AppLayout() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {isAdmin && (
-                <Button asChild variant="ghost" size="sm" title="Admin inbox">
-                  <Link to="/admin/inbox"><ShieldCheck className="h-4 w-4 mr-1" /> Inbox</Link>
-                </Button>
-              )}
               <NotificationBell />
               <Button asChild variant="ghost" size="sm" title="Temporary chat (nothing saved)">
                 <Link to="/chat" search={{ temp: "1" }}>
