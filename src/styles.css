@@ -418,9 +418,9 @@
 /* =============== Hola loader (jumping dots + icon + pink dust) =============== */
 .hola-loader-bg {
   background:
-    radial-gradient(ellipse at 50% 65%, rgba(236, 72, 153, 0.35), transparent 55%),
-    radial-gradient(ellipse at 50% 90%, rgba(236, 72, 153, 0.55), transparent 40%),
-    linear-gradient(180deg, #1a0b2e 0%, #2a0f4a 50%, #1a0b2e 100%);
+    radial-gradient(ellipse at 50% 65%, color-mix(in oklch, var(--color-primary) 35%, transparent), transparent 55%),
+    radial-gradient(ellipse at 50% 90%, color-mix(in oklch, var(--color-primary) 55%, transparent), transparent 40%),
+    linear-gradient(180deg, var(--color-background) 0%, color-mix(in oklch, var(--color-primary) 20%, var(--color-background)) 50%, var(--color-background) 100%);
 }
 .hola-loader-dust {
   position: absolute;
