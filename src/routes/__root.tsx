@@ -92,6 +92,22 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => {
+      console.error("[Hola] window error:", e.error ?? e.message);
+      reportLovableError(e.error ?? new Error(e.message), { boundary: "window_error" });
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      console.error("[Hola] unhandled rejection:", e.reason);
+      reportLovableError(e.reason instanceof Error ? e.reason : new Error(String(e.reason)), { boundary: "unhandled_rejection" });
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
