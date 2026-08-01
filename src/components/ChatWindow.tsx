@@ -222,6 +222,7 @@ function ChatWindowInner({
               memories,
               messageLength,
               behavior,
+              ...((body as { context?: Record<string, unknown> } | undefined)?.context ?? {}),
             },
           },
         }),

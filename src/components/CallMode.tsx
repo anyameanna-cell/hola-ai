@@ -59,22 +59,41 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
   const nodeRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const chunksRef = useRef<Float32Array[]>([]);
+  const transcriptRef = useRef("");
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transcriptionQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const queueLiveSegment = (sampleRate: number) => {
+    const chunks = chunksRef.current;
+    chunksRef.current = [];
+    if (chunks.length === 0) return;
+    transcriptionQueueRef.current = transcriptionQueueRef.current.then(async () => {
+      const next = await transcribe(encodeWav(chunks, sampleRate));
+      if (!next) return;
+      transcriptRef.current = `${transcriptRef.current} ${next}`.trim();
+      setText(transcriptRef.current);
+    }).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Live transcription paused");
+    });
+  };
 
   const stop = async (send = true) => {
     const stream = streamRef.current;
     const context = contextRef.current;
-    const chunks = chunksRef.current;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = null;
     stream?.getTracks().forEach((track) => track.stop());
     nodeRef.current?.disconnect(); sourceRef.current?.disconnect();
     if (context) await context.close().catch(() => {});
-    streamRef.current = null; contextRef.current = null; nodeRef.current = null; sourceRef.current = null; chunksRef.current = [];
+    if (context) queueLiveSegment(context.sampleRate);
+    streamRef.current = null; contextRef.current = null; nodeRef.current = null; sourceRef.current = null;
     setListening(false);
-    if (!send || !context || chunks.length === 0) return;
+    if (!send || !context) return;
     try {
-      const next = await transcribe(encodeWav(chunks, context.sampleRate));
-      if (!next) throw new Error("I couldn't hear any speech.");
-      setText(next);
-      await onTranscript(next);
+      await transcriptionQueueRef.current;
+      const finalText = transcriptRef.current.trim();
+      if (!finalText) throw new Error("I couldn't hear any speech.");
+      await onTranscript(finalText);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not transcribe the call");
     }
@@ -87,16 +106,22 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
       const source = context.createMediaStreamSource(stream);
       const node = context.createScriptProcessor(4096, 1, 1);
       chunksRef.current = [];
+      transcriptRef.current = "";
+      transcriptionQueueRef.current = Promise.resolve();
       node.onaudioprocess = (event) => chunksRef.current.push(new Float32Array(event.inputBuffer.getChannelData(0)));
       source.connect(node); node.connect(context.destination);
       streamRef.current = stream; contextRef.current = context; sourceRef.current = source; nodeRef.current = node;
+      intervalRef.current = setInterval(() => queueLiveSegment(context.sampleRate), 4000);
       setText(""); setListening(true);
     } catch {
       toast.error("Microphone access is needed to start a call.");
     }
   };
 
-  useEffect(() => () => { streamRef.current?.getTracks().forEach((track) => track.stop()); }, []);
+  useEffect(() => () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   return (
     <>
@@ -111,7 +136,7 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
           </DialogHeader>
           <div className="flex flex-col items-center gap-5 py-6" aria-live="polite">
             <div className={listening ? "animate-pulse" : ""}><HolaLogo size={88} /></div>
-            <div className="min-h-12 text-sm text-muted-foreground">{listening ? "Listening… tap Done when you finish." : text || "Ready when you are."}</div>
+            <div className="min-h-12 text-sm text-muted-foreground">{listening ? text || "Listening… your words will appear here." : text || "Ready when you are."}</div>
             {listening ? (
               <Button type="button" onClick={() => void stop(true)}><Volume2 className="h-4 w-4 mr-2" />Done speaking</Button>
             ) : (
