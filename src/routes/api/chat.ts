@@ -94,6 +94,7 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const system = buildSystemPrompt(body.context ?? {}) + imageInjection;
+        console.info(`[Hola] Injecting ${(body.context?.memories ?? []).length} global memories for this request.`);
 
         const result = streamText({
           model: gateway(modelId),

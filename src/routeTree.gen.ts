@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
@@ -42,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiTtsRoute = ApiTtsRouteImport.update({
   id: '/api/tts',
   path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_app/chat': typeof AppChatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/tts': typeof ApiTtsRoute
   '/_app/admin/inbox': typeof AppAdminInboxRoute
   '/_app/c/$threadId': typeof AppCThreadIdRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/transcribe'
     | '/api/tts'
     | '/admin/inbox'
     | '/c/$threadId'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/transcribe'
     | '/api/tts'
     | '/admin/inbox'
     | '/c/$threadId'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_app/chat'
     | '/api/chat'
     | '/api/generate-image'
+    | '/api/transcribe'
     | '/api/tts'
     | '/_app/admin/inbox'
     | '/_app/c/$threadId'
@@ -149,6 +161,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiTtsRoute: typeof ApiTtsRoute
 }
 
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tts'
       fullPath: '/api/tts'
       preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
@@ -248,6 +268,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
   ApiTtsRoute: ApiTtsRoute,
 }
 export const routeTree = rootRouteImport

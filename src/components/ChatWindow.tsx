@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
+import { CallMode } from "@/components/CallMode";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -137,7 +138,7 @@ function ChatWindowInner({
   const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread snippets + ultra memories for context
+  // Load profile name + recent thread snippets + ultra memories for context.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -188,6 +189,19 @@ function ChatWindowInner({
       window.removeEventListener("hola:memory-changed", onMemoryChanged);
     };
   }, [user, threadId]);
+
+  const refreshPersonalContext = async () => {
+    if (!user) return { displayName, memories };
+    const [profileResult, memoriesResult] = await Promise.all([
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+      supabase.from("memories").select("content").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
+    ]);
+    const nextName = profileResult.data?.display_name ?? null;
+    const nextMemories = (memoriesResult.data ?? []).map((row) => row.content);
+    setDisplayName(nextName);
+    setMemories(nextMemories);
+    return { displayName: nextName, memories: nextMemories };
+  };
 
   const transport = useMemo(
     () =>
@@ -368,11 +382,10 @@ function ChatWindowInner({
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const sendUserText = async (text: string, pickedAttachments = attachments) => {
+    if ((!text && pickedAttachments.length === 0) || status === "streaming" || status === "submitted" || !user) return;
+    const freshContext = await refreshPersonalContext();
     e.preventDefault();
-    const text = input.trim();
-    if ((!text && attachments.length === 0) || status === "streaming" || status === "submitted") return;
-    if (!user) return;
     const userFacts = extractUserMemoryRequests(text);
     if (!temporary && userFacts.length > 0) {
       const fresh = getFreshMemories(memories, userFacts);
@@ -384,15 +397,29 @@ function ChatWindowInner({
       }
     }
     setInput("");
-    const atts = attachments;
+    const atts = pickedAttachments;
     setAttachments([]);
+    const body = { context: {
+      displayName: freshContext.displayName ?? user.user_metadata?.full_name ?? null,
+      email: user.email,
+      theme, mode, fontFamily, fontSize, temporary, recentChats,
+      memories: freshContext.memories,
+      messageLength, behavior,
+    } };
     if (atts.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileParts: any[] = atts.map((a) => ({ type: "file", url: a.url, mediaType: a.mediaType }));
-      await sendMessage({ role: "user", parts: [...fileParts, { type: "text", text: text || "" }] });
+      await sendMessage({ role: "user", parts: [...fileParts, { type: "text", text: text || "" }] }, { body });
     } else {
-      await sendMessage({ text });
+      await sendMessage({ text }, { body });
     }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    setInput("");
+    await sendUserText(text);
   };
 
   const showEmpty = messages.length === 0;
@@ -406,7 +433,7 @@ function ChatWindowInner({
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {showEmpty ? (
-          <EmptyState onPick={(t) => setInput(t)} temporary={temporary} />
+          <EmptyState onPick={(t) => setInput(t)} temporary={temporary} displayName={displayName} />
         ) : (
           <div className="mx-auto max-w-3xl w-full px-4 py-6 space-y-6">
             <AnimatePresence initial={false}>
@@ -494,6 +521,7 @@ function ChatWindowInner({
               >
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
+              <CallMode onTranscript={async (text) => sendUserText(text, [])} />
             </div>
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
@@ -701,14 +729,14 @@ const SUGGESTIONS = [
   "Help me plan a 3-day trip to Lisbon",
 ];
 
-function EmptyState({ onPick, temporary }: { onPick: (t: string) => void; temporary: boolean }) {
+function EmptyState({ onPick, temporary, displayName }: { onPick: (t: string) => void; temporary: boolean; displayName: string | null }) {
   return (
     <div className="h-full min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
       <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
         <HolaLogo size={80} />
       </motion.div>
       <h1 className="mt-6 text-4xl font-bold tracking-tight">
-        Hola, <span className="text-brand-gradient">how can I help?</span>
+        Hola{displayName ? `, ${displayName}` : ""}. <span className="text-brand-gradient">How can I help?</span>
       </h1>
       <p className="mt-2 text-muted-foreground flex items-center gap-1.5">
         {temporary ? <><Ghost className="h-4 w-4" /> Temporary chat — nothing is saved.</> : <><Sparkles className="h-4 w-4" /> Ask anything, or try a prompt below.</>}

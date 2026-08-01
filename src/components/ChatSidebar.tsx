@@ -76,7 +76,13 @@ export function ChatSidebar() {
       setDisplayName(data?.display_name ?? null);
     });
     const onChange = () => load();
+    const onProfileChanged = () => {
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle().then(({ data }) => {
+        setDisplayName(data?.display_name ?? null);
+      });
+    };
     window.addEventListener("hola:threads-changed", onChange);
+    window.addEventListener("hola:profile-changed", onProfileChanged);
     const channel = supabase
       .channel("threads-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "threads", filter: `user_id=eq.${user.id}` }, () => load())
@@ -90,6 +96,7 @@ export function ChatSidebar() {
       .subscribe();
     return () => {
       window.removeEventListener("hola:threads-changed", onChange);
+      window.removeEventListener("hola:profile-changed", onProfileChanged);
       supabase.removeChannel(channel);
       supabase.removeChannel(profileChannel);
     };
