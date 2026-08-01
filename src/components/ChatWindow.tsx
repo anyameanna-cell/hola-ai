@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
+import { CallMode } from "@/components/CallMode";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,7 @@ function ChatWindowInner({
   const [recentChats, setRecentChats] = useState<{ title: string; snippet?: string }[]>([]);
   const [memories, setMemories] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
+  const [autoSpeakReply, setAutoSpeakReply] = useState(false);
   const [attachments, setAttachments] = useState<{ id: string; url: string; mediaType: string; name: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -137,7 +139,7 @@ function ChatWindowInner({
   const lastRetitledAt = useRef(0);
   const makeTitle = useServerFn(generateThreadTitle);
 
-  // Load profile name + recent thread snippets + ultra memories for context
+  // Load profile name + recent thread snippets + ultra memories for context.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -189,6 +191,19 @@ function ChatWindowInner({
     };
   }, [user, threadId]);
 
+  const refreshPersonalContext = async () => {
+    if (!user) return { displayName, memories };
+    const [profileResult, memoriesResult] = await Promise.all([
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+      supabase.from("memories").select("content").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
+    ]);
+    const nextName = profileResult.data?.display_name ?? null;
+    const nextMemories = (memoriesResult.data ?? []).map((row) => row.content);
+    setDisplayName(nextName);
+    setMemories(nextMemories);
+    return { displayName: nextName, memories: nextMemories };
+  };
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -207,6 +222,7 @@ function ChatWindowInner({
               memories,
               messageLength,
               behavior,
+              ...((body as { context?: Record<string, unknown> } | undefined)?.context ?? {}),
             },
           },
         }),
@@ -368,31 +384,41 @@ function ChatWindowInner({
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const text = input.trim();
-    if ((!text && attachments.length === 0) || status === "streaming" || status === "submitted") return;
-    if (!user) return;
+  const sendUserText = async (text: string, pickedAttachments = attachments) => {
+    if ((!text && pickedAttachments.length === 0) || status === "streaming" || status === "submitted" || !user) return;
     const userFacts = extractUserMemoryRequests(text);
     if (!temporary && userFacts.length > 0) {
       const fresh = getFreshMemories(memories, userFacts);
       if (fresh.length > 0) {
-        supabase.from("memories").insert(fresh.map((content) => ({ user_id: user.id, content }))).then(({ data }) => {
-          if (data) window.dispatchEvent(new CustomEvent("hola:memory-changed"));
-        });
-        setMemories((prev) => [...fresh, ...prev]);
+        const { error } = await supabase.from("memories").insert(fresh.map((content) => ({ user_id: user.id, content })));
+        if (!error) window.dispatchEvent(new CustomEvent("hola:memory-changed"));
       }
     }
+    const freshContext = await refreshPersonalContext();
     setInput("");
-    const atts = attachments;
+    const atts = pickedAttachments;
     setAttachments([]);
+    const body = { context: {
+      displayName: freshContext.displayName ?? user.user_metadata?.full_name ?? null,
+      email: user.email,
+      theme, mode, fontFamily, fontSize, temporary, recentChats,
+      memories: freshContext.memories,
+      messageLength, behavior,
+    } };
     if (atts.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileParts: any[] = atts.map((a) => ({ type: "file", url: a.url, mediaType: a.mediaType }));
-      await sendMessage({ role: "user", parts: [...fileParts, { type: "text", text: text || "" }] });
+      await sendMessage({ role: "user", parts: [...fileParts, { type: "text", text: text || "" }] }, { body });
     } else {
-      await sendMessage({ text });
+      await sendMessage({ text }, { body });
     }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    setInput("");
+    await sendUserText(text);
   };
 
   const showEmpty = messages.length === 0;
@@ -406,12 +432,12 @@ function ChatWindowInner({
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {showEmpty ? (
-          <EmptyState onPick={(t) => setInput(t)} temporary={temporary} />
+          <EmptyState onPick={(t) => setInput(t)} temporary={temporary} displayName={displayName} />
         ) : (
           <div className="mx-auto max-w-3xl w-full px-4 py-6 space-y-6">
             <AnimatePresence initial={false}>
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} ttsVoice={ttsVoice} ttsSpeed={ttsSpeed} ttsVolume={ttsVolume} />
+                <MessageBubble key={m.id} message={m} streaming={status === "streaming" && m === messages[messages.length - 1]} ttsVoice={ttsVoice} ttsSpeed={ttsSpeed} ttsVolume={ttsVolume} autoSpeak={autoSpeakReply && m.role === "assistant" && m === messages[messages.length - 1] && status === "ready"} />
               ))}
             </AnimatePresence>
             {status === "submitted" && (() => {
@@ -494,6 +520,7 @@ function ChatWindowInner({
               >
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
+              <CallMode onTranscript={async (text) => { setAutoSpeakReply(true); await sendUserText(text, []); }} />
             </div>
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
@@ -517,7 +544,7 @@ function ChatWindowInner({
   );
 }
 
-const MessageBubble = memo(function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume }: { message: UIMessage; streaming: boolean; ttsVoice: string; ttsSpeed: number; ttsVolume: number }) {
+const MessageBubble = memo(function MessageBubble({ message, streaming, ttsVoice, ttsSpeed, ttsVolume, autoSpeak }: { message: UIMessage; streaming: boolean; ttsVoice: string; ttsSpeed: number; ttsVolume: number; autoSpeak: boolean }) {
   const isUser = message.role === "user";
   const rawText = partsToText(message.parts);
   const text = isUser ? rawText : stripMemoryComments(rawText);
@@ -549,7 +576,7 @@ const MessageBubble = memo(function MessageBubble({ message, streaming, ttsVoice
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className={`flex-1 min-w-0 ${streaming ? "streaming-caret" : ""}`}>
         <MarkdownContent streaming={streaming}>{text}</MarkdownContent>
-        {!streaming && text && <SpeakButton text={text} voice={ttsVoice} speed={ttsSpeed} volume={ttsVolume} />}
+        {!streaming && text && <SpeakButton text={text} voice={ttsVoice} speed={ttsSpeed} volume={ttsVolume} autoPlay={autoSpeak} />}
       </div>
     </motion.div>
   );
@@ -557,15 +584,17 @@ const MessageBubble = memo(function MessageBubble({ message, streaming, ttsVoice
   // Re-render only when content, streaming state, or TTS settings actually change.
   if (prev.streaming !== next.streaming) return false;
   if (prev.ttsVoice !== next.ttsVoice || prev.ttsSpeed !== next.ttsSpeed || prev.ttsVolume !== next.ttsVolume) return false;
+  if (prev.autoSpeak !== next.autoSpeak) return false;
   if (prev.message.id !== next.message.id) return false;
   const a = partsToText(prev.message.parts);
   const b = partsToText(next.message.parts);
   return a === b;
 });
 
-function SpeakButton({ text, voice, speed, volume }: { text: string; voice: string; speed: number; volume: number }) {
+function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: string; voice: string; speed: number; volume: number; autoPlay?: boolean }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoPlayedRef = useRef(false);
 
   const toggle = async () => {
     if (playing) {
@@ -605,6 +634,12 @@ function SpeakButton({ text, voice, speed, volume }: { text: string; voice: stri
       toast.error(err instanceof Error ? err.message : "Could not play audio");
     }
   };
+
+  useEffect(() => {
+    if (!autoPlay || autoPlayedRef.current) return;
+    autoPlayedRef.current = true;
+    void toggle();
+  }, [autoPlay]);
 
   return (
     <button
@@ -701,14 +736,14 @@ const SUGGESTIONS = [
   "Help me plan a 3-day trip to Lisbon",
 ];
 
-function EmptyState({ onPick, temporary }: { onPick: (t: string) => void; temporary: boolean }) {
+function EmptyState({ onPick, temporary, displayName }: { onPick: (t: string) => void; temporary: boolean; displayName: string | null }) {
   return (
     <div className="h-full min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
       <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
         <HolaLogo size={80} />
       </motion.div>
       <h1 className="mt-6 text-4xl font-bold tracking-tight">
-        Hola, <span className="text-brand-gradient">how can I help?</span>
+        Hola{displayName ? `, ${displayName}` : ""}. <span className="text-brand-gradient">How can I help?</span>
       </h1>
       <p className="mt-2 text-muted-foreground flex items-center gap-1.5">
         {temporary ? <><Ghost className="h-4 w-4" /> Temporary chat — nothing is saved.</> : <><Sparkles className="h-4 w-4" /> Ask anything, or try a prompt below.</>}
