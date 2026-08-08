@@ -22,6 +22,16 @@ interface ContactMessage {
 }
 
 export const Route = createFileRoute("/_app/admin/inbox")({
+  head: () => ({
+    meta: [
+      { title: "Staff Inbox — Hola AI" },
+      { name: "description", content: "Review contact messages and send in-app replies from the Hola AI staff inbox." },
+      { property: "og:title", content: "Staff Inbox — Hola AI" },
+      { property: "og:description", content: "Review contact messages and send in-app replies from the Hola AI staff inbox." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: AdminInboxPage,
 });
 

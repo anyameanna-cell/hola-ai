@@ -21,6 +21,10 @@ export const Route = createFileRoute("/contact")({
     meta: [
       { title: "Contact — Hola AI" },
       { name: "description", content: "Send a message to the Hola team. We reply through in-app notifications." },
+      { property: "og:title", content: "Contact — Hola AI" },
+      { property: "og:description", content: "Send a message to the Hola team. We reply through in-app notifications." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ContactPage,
