@@ -398,13 +398,21 @@ function ChatWindowInner({
     setInput("");
     const atts = pickedAttachments;
     setAttachments([]);
+    const promptDisplayName = freshContext.displayName ?? user.user_metadata?.full_name ?? null;
     const body = { context: {
-      displayName: freshContext.displayName ?? user.user_metadata?.full_name ?? null,
+      displayName: promptDisplayName,
       email: user.email,
       theme, mode, fontFamily, fontSize, temporary, recentChats,
       memories: freshContext.memories,
       messageLength, behavior,
     } };
+    recordPromptDiagnostics({
+      userId: user.id,
+      displayName: promptDisplayName,
+      memoryCount: freshContext.memories.length,
+      threadId,
+      at: Date.now(),
+    });
     if (atts.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileParts: any[] = atts.map((a) => ({ type: "file", url: a.url, mediaType: a.mediaType }));
