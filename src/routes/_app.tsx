@@ -37,6 +37,11 @@ function AppLayout() {
                   <Ghost className="h-4 w-4 mr-1" /> Temporary
                 </Link>
               </Button>
+              <Button asChild variant="ghost" size="sm" title="Connections & diagnostics">
+                <Link to="/connections">Connections</Link>
+              </Button>
+
+
               <Button asChild size="sm" className="bg-brand-gradient text-white border-0 shadow-brand">
                 <Link to="/chat"><Plus className="h-4 w-4 mr-1" /> New</Link>
               </Button>
