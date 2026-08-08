@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { generateThreadTitle } from "@/lib/title.functions";
 import { extractMemoryComments, extractUserMemoryRequests, getFreshMemories, stripMemoryComments } from "@/lib/memory";
 import { toast } from "sonner";
+import { recordPromptDiagnostics } from "@/lib/prompt-diagnostics";
 
 interface ChatWindowProps {
   threadId: string;
