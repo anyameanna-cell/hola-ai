@@ -10,7 +10,12 @@ export const Route = createFileRoute("/api/transcribe")({
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("Speech transcription is unavailable", { status: 500 });
 
-        const incoming = await request.formData();
+        let incoming: FormData;
+        try {
+          incoming = await request.formData();
+        } catch {
+          return new Response("A WAV recording is required", { status: 400 });
+        }
         const audio = incoming.get("file");
         if (!(audio instanceof File) || audio.size < 2048) {
           return new Response("That recording was empty — please try again.", { status: 400 });

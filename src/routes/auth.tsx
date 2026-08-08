@@ -15,6 +15,10 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Sign in — Hola AI" },
       { name: "description", content: "Sign in to Hola AI to start chatting." },
+      { property: "og:title", content: "Sign in — Hola AI" },
+      { property: "og:description", content: "Sign in to Hola AI to start chatting." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,
