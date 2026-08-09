@@ -475,3 +475,10 @@
   30%           { transform: translateY(-14px); opacity: 1; }
 }
 
+
+/* Hola speaking glow (call mode) */
+@keyframes hola-speaking-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px color-mix(in oklch, var(--color-primary) 55%, transparent)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 22px var(--color-primary)); transform: scale(1.05); }
+}
+.hola-speaking-glow { animation: hola-speaking-glow 1.2s ease-in-out infinite; }

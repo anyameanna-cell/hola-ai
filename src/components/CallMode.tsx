@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, PhoneOff, Volume2 } from "lucide-react";
+import { Mic, Phone, PhoneOff, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { HolaLogo } from "@/components/HolaLogo";
