@@ -50,12 +50,12 @@ export const Route = createFileRoute("/api/generate-image")({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image",
-            prompt,
-            size: "1024x1024",
-            n: 1,
+            model: "google/gemini-3.1-flash-image",
+            messages: [{ role: "user", content: prompt }],
+            modalities: ["image", "text"],
           }),
         });
+
         if (!res.ok) {
           const txt = await res.text().catch(() => "");
           return new Response(txt || "Image generation failed", { status: res.status });
