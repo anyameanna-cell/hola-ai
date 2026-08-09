@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Copy, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BrushSpinner } from "@/components/BrushSpinner";
 import mermaid from "mermaid";
 
 // Init mermaid exactly once for the page
