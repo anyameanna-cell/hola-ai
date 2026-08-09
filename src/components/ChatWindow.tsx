@@ -530,7 +530,11 @@ function ChatWindowInner({
               >
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
-              <CallMode onTranscript={async (text) => { setAutoSpeakReply(true); await sendUserText(text, []); }} />
+              <CallMode
+                onTranscript={async (text) => { setAutoSpeakReply(true); await sendUserText(text, []); }}
+                onEnd={() => setAutoSpeakReply(false)}
+              />
+
             </div>
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
