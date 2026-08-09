@@ -10,6 +10,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
 import { CallMode } from "@/components/CallMode";
+import { BrushSpinner } from "@/components/BrushSpinner";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
