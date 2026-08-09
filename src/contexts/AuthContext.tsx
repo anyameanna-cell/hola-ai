@@ -17,16 +17,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setLoading(false);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
+      finish();
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
-    return () => subscription.unsubscribe();
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      })
+      .catch((err) => console.error("[Hola] getSession failed", err))
+      .finally(finish);
+
+    // Safety net: never leave the app stuck on a blank loading screen
+    // if storage access is blocked (e.g. inside a preview iframe).
+    const t = setTimeout(finish, 4000);
+
+    return () => {
+      clearTimeout(t);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
