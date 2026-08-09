@@ -286,15 +286,8 @@ function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
       <span className="relative inline-block my-3 max-w-full">
         {!loaded && (
           <span className="flex items-center justify-center w-full max-w-[520px] aspect-square rounded-lg border bg-card/70">
-            <svg width="80" height="80" viewBox="0 0 56 56" className="text-primary" aria-label="Loading image">
-              <circle cx="28" cy="28" r="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="113" style={{ animation: "hola-brush-stroke 1.6s ease-in-out infinite" }} />
-              <g style={{ animation: "hola-brush-orbit 1.6s linear infinite", transformOrigin: "28px 28px" }}>
-                <g transform="translate(46 28)">
-                  <rect x="-3" y="-1.5" width="10" height="3" rx="1.5" fill="currentColor" />
-                  <path d="M7 -3 L13 0 L7 3 Z" fill="currentColor" />
-                </g>
-              </g>
-            </svg>
+            <BrushSpinner size={80} label="Loading image" />
+
           </span>
         )}
         <img
