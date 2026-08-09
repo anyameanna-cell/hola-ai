@@ -606,11 +606,16 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayedRef = useRef(false);
 
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlaying(false);
+    window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
+  };
+
   const toggle = async () => {
     if (playing) {
-      audioRef.current?.pause();
-      audioRef.current = null;
-      setPlaying(false);
+      stopAudio();
       return;
     }
     try {
@@ -628,7 +633,11 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
       audio.src = url;
       audio.volume = Math.max(0, Math.min(1, volume));
       audioRef.current = audio;
-      const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      const cleanup = () => {
+        setPlaying(false);
+        URL.revokeObjectURL(url);
+        window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
+      };
       audio.onended = cleanup;
       audio.onerror = cleanup;
       audio.load();
@@ -639,17 +648,26 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
       });
       audio.currentTime = 0;
       await audio.play();
+      window.dispatchEvent(new CustomEvent("hola:speaking", { detail: true }));
     } catch (err) {
       setPlaying(false);
+      window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
       toast.error(err instanceof Error ? err.message : "Could not play audio");
     }
   };
+
+  useEffect(() => {
+    const onStop = () => stopAudio();
+    window.addEventListener("hola:stop-speech", onStop);
+    return () => window.removeEventListener("hola:stop-speech", onStop);
+  });
 
   useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;
     autoPlayedRef.current = true;
     void toggle();
   }, [autoPlay]);
+
 
   return (
     <button
