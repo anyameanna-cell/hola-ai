@@ -320,7 +320,15 @@
 /* Let diagrams grow naturally; the .mermaid-host container scrolls when needed */
 .mermaid-host { max-width: 100%; }
 .mermaid-host svg { height: auto; max-width: none; }
-.mermaid-host .nodeLabel, .mermaid-host .edgeLabel { white-space: nowrap; }
+.mermaid-host .nodeLabel, .mermaid-host .edgeLabel,
+.mermaid-host .node text, .mermaid-host .edgeLabel text {
+  font-family: ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 15px !important;
+  white-space: nowrap;
+}
+/* Keep label text inside its box */
+.mermaid-host .node text { dominant-baseline: middle; }
+
 
 /* Chat composer: prevent layout shift while typing */
 .chat-composer { contain: layout style; }
@@ -467,3 +475,10 @@
   30%           { transform: translateY(-14px); opacity: 1; }
 }
 
+
+/* Hola speaking glow (call mode) */
+@keyframes hola-speaking-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px color-mix(in oklch, var(--color-primary) 55%, transparent)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 22px var(--color-primary)); transform: scale(1.05); }
+}
+.hola-speaking-glow { animation: hola-speaking-glow 1.2s ease-in-out infinite; }

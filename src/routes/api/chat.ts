@@ -35,20 +35,24 @@ async function generateImageInline(prompt: string): Promise<string | null> {
       method: "POST",
       headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        prompt,
-        size: "1024x1024",
-        n: 1,
+        model: "google/gemini-3.1-flash-image",
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("[Hola] image gen failed", res.status, (await res.text().catch(() => "")).slice(0, 300));
+      return null;
+    }
     const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
     const first = json.data?.[0];
     return first?.b64_json ? `data:image/png;base64,${first.b64_json}` : first?.url ?? null;
-  } catch {
+  } catch (err) {
+    console.error("[Hola] image gen error", err);
     return null;
   }
 }
+
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -85,12 +89,13 @@ export const Route = createFileRoute("/api/chat")({
           if (url) {
             imageInjection =
               `\n\n## Just-generated image\n` +
-              `An image was already generated for this request. Include this exact markdown near the top of your reply (short caption above it):\n\n` +
+              `An image was already generated for this request. Write your short reply text FIRST, then put this exact markdown on its own new line at the END of your reply (nothing after it):\n\n` +
               `![generated image](${url})\n`;
           } else {
             imageInjection =
               `\n\n## Image generation\nImage generation failed — apologize briefly and offer to retry with a clearer prompt.`;
           }
+
         }
 
         const system = buildSystemPrompt(body.context ?? {}) + imageInjection;

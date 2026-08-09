@@ -10,6 +10,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { HolaLogo } from "@/components/HolaLogo";
 import { HolaLoader } from "@/components/HolaLoader";
 import { CallMode } from "@/components/CallMode";
+import { BrushSpinner } from "@/components/BrushSpinner";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -529,7 +530,11 @@ function ChatWindowInner({
               >
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
-              <CallMode onTranscript={async (text) => { setAutoSpeakReply(true); await sendUserText(text, []); }} />
+              <CallMode
+                onTranscript={async (text) => { setAutoSpeakReply(true); await sendUserText(text, []); }}
+                onEnd={() => setAutoSpeakReply(false)}
+              />
+
             </div>
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {isBusy ? (
@@ -605,11 +610,16 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayedRef = useRef(false);
 
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlaying(false);
+    window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
+  };
+
   const toggle = async () => {
     if (playing) {
-      audioRef.current?.pause();
-      audioRef.current = null;
-      setPlaying(false);
+      stopAudio();
       return;
     }
     try {
@@ -627,7 +637,11 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
       audio.src = url;
       audio.volume = Math.max(0, Math.min(1, volume));
       audioRef.current = audio;
-      const cleanup = () => { setPlaying(false); URL.revokeObjectURL(url); };
+      const cleanup = () => {
+        setPlaying(false);
+        URL.revokeObjectURL(url);
+        window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
+      };
       audio.onended = cleanup;
       audio.onerror = cleanup;
       audio.load();
@@ -638,17 +652,26 @@ function SpeakButton({ text, voice, speed, volume, autoPlay = false }: { text: s
       });
       audio.currentTime = 0;
       await audio.play();
+      window.dispatchEvent(new CustomEvent("hola:speaking", { detail: true }));
     } catch (err) {
       setPlaying(false);
+      window.dispatchEvent(new CustomEvent("hola:speaking", { detail: false }));
       toast.error(err instanceof Error ? err.message : "Could not play audio");
     }
   };
+
+  useEffect(() => {
+    const onStop = () => stopAudio();
+    window.addEventListener("hola:stop-speech", onStop);
+    return () => window.removeEventListener("hola:stop-speech", onStop);
+  });
 
   useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;
     autoPlayedRef.current = true;
     void toggle();
   }, [autoPlay]);
+
 
   return (
     <button
@@ -669,30 +692,13 @@ function ImageGenBubble() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className="w-full max-w-[520px] aspect-square rounded-xl border bg-card/70 flex flex-col items-center justify-center gap-4 shadow-sm">
-        <svg width="112" height="112" viewBox="0 0 56 56" className="text-primary" aria-label="Painting your image">
-          <circle
-            cx="28"
-            cy="28"
-            r="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeDasharray="113"
-            style={{ animation: "hola-brush-stroke 1.6s ease-in-out infinite" }}
-          />
-          <g style={{ animation: "hola-brush-orbit 1.6s linear infinite", transformOrigin: "28px 28px" }}>
-            <g transform="translate(46 28)">
-              <rect x="-3" y="-1.5" width="10" height="3" rx="1.5" fill="currentColor" />
-              <path d="M7 -3 L13 0 L7 3 Z" fill="currentColor" />
-            </g>
-          </g>
-        </svg>
+        <BrushSpinner size={112} />
         <span className="text-sm text-muted-foreground">Painting your image…</span>
       </div>
     </motion.div>
   );
 }
+
 
 function DiagramGenBubble() {
   return (
