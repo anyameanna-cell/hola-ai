@@ -89,12 +89,13 @@ export const Route = createFileRoute("/api/chat")({
           if (url) {
             imageInjection =
               `\n\n## Just-generated image\n` +
-              `An image was already generated for this request. Include this exact markdown near the top of your reply (short caption above it):\n\n` +
+              `An image was already generated for this request. Write your short reply text FIRST, then put this exact markdown on its own new line at the END of your reply (nothing after it):\n\n` +
               `![generated image](${url})\n`;
           } else {
             imageInjection =
               `\n\n## Image generation\nImage generation failed — apologize briefly and offer to retry with a clearer prompt.`;
           }
+
         }
 
         const system = buildSystemPrompt(body.context ?? {}) + imageInjection;
