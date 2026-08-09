@@ -13,9 +13,11 @@ function ensureMermaid() {
     startOnLoad: false,
     theme: dark ? "dark" : "default",
     securityLevel: "loose",
-    fontFamily: "inherit",
-    flowchart: { useMaxWidth: false, htmlLabels: true, nodeSpacing: 60, rankSpacing: 70, padding: 12 },
+    fontFamily: "ui-sans-serif, system-ui, sans-serif",
+    fontSize: 15,
+    flowchart: { useMaxWidth: false, htmlLabels: false, nodeSpacing: 60, rankSpacing: 70, padding: 20, wrappingWidth: 260 },
   });
+
   mermaidInit = true;
 }
 
