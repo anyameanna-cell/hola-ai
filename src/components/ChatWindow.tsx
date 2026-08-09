@@ -669,30 +669,13 @@ function ImageGenBubble() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
       <HolaLogo size={32} className="mt-0.5 shrink-0" />
       <div className="w-full max-w-[520px] aspect-square rounded-xl border bg-card/70 flex flex-col items-center justify-center gap-4 shadow-sm">
-        <svg width="112" height="112" viewBox="0 0 56 56" className="text-primary" aria-label="Painting your image">
-          <circle
-            cx="28"
-            cy="28"
-            r="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeDasharray="113"
-            style={{ animation: "hola-brush-stroke 1.6s ease-in-out infinite" }}
-          />
-          <g style={{ animation: "hola-brush-orbit 1.6s linear infinite", transformOrigin: "28px 28px" }}>
-            <g transform="translate(46 28)">
-              <rect x="-3" y="-1.5" width="10" height="3" rx="1.5" fill="currentColor" />
-              <path d="M7 -3 L13 0 L7 3 Z" fill="currentColor" />
-            </g>
-          </g>
-        </svg>
+        <BrushSpinner size={112} />
         <span className="text-sm text-muted-foreground">Painting your image…</span>
       </div>
     </motion.div>
   );
 }
+
 
 function DiagramGenBubble() {
   return (
