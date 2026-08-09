@@ -50,9 +50,10 @@ async function transcribe(blob: Blob): Promise<string> {
   return transcript.trim();
 }
 
-export function CallMode({ onTranscript }: { onTranscript: (text: string) => Promise<void> }) {
+export function CallMode({ onTranscript, onEnd }: { onTranscript: (text: string) => Promise<void>; onEnd?: () => void }) {
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [text, setText] = useState("");
   const streamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
@@ -62,6 +63,12 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
   const transcriptRef = useRef("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriptionQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    const onSpeaking = (e: Event) => setSpeaking(Boolean((e as CustomEvent).detail));
+    window.addEventListener("hola:speaking", onSpeaking);
+    return () => window.removeEventListener("hola:speaking", onSpeaking);
+  }, []);
 
   const queueLiveSegment = (sampleRate: number) => {
     const chunks = chunksRef.current;
@@ -77,17 +84,24 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
     });
   };
 
-  const stop = async (send = true) => {
-    const stream = streamRef.current;
-    const context = contextRef.current;
+  const teardown = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
-    stream?.getTracks().forEach((track) => track.stop());
-    nodeRef.current?.disconnect(); sourceRef.current?.disconnect();
-    if (context) await context.close().catch(() => {});
-    if (context) queueLiveSegment(context.sampleRate);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    try { nodeRef.current?.disconnect(); } catch { /* noop */ }
+    try { sourceRef.current?.disconnect(); } catch { /* noop */ }
+    const context = contextRef.current;
     streamRef.current = null; contextRef.current = null; nodeRef.current = null; sourceRef.current = null;
     setListening(false);
+    return context;
+  };
+
+  const stop = async (send = true) => {
+    const context = teardown();
+    if (context) {
+      queueLiveSegment(context.sampleRate);
+      void context.close().catch(() => {});
+    }
     if (!send || !context) return;
     try {
       await transcriptionQueueRef.current;
@@ -97,6 +111,20 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not transcribe the call");
     }
+  };
+
+  const endCall = () => {
+    teardown();
+    const context = contextRef.current;
+    void context?.close().catch(() => {});
+    chunksRef.current = [];
+    transcriptRef.current = "";
+    transcriptionQueueRef.current = Promise.resolve();
+    setText("");
+    setSpeaking(false);
+    window.dispatchEvent(new CustomEvent("hola:stop-speech"));
+    onEnd?.();
+    setOpen(false);
   };
 
   const start = async () => {
@@ -126,23 +154,25 @@ export function CallMode({ onTranscript }: { onTranscript: (text: string) => Pro
   return (
     <>
       <Button type="button" size="icon" variant="ghost" title="Call Hola" aria-label="Call Hola" onClick={() => setOpen(true)} className="rounded-full h-9 w-9 text-muted-foreground hover:text-foreground">
-        <Mic className="h-4 w-4" />
+        <Phone className="h-4 w-4" />
       </Button>
-      <Dialog open={open} onOpenChange={(next) => { if (!next && listening) void stop(false); setOpen(next); }}>
+      <Dialog open={open} onOpenChange={(next) => { if (!next) endCall(); else setOpen(true); }}>
         <DialogContent className="max-w-sm text-center">
           <DialogHeader>
             <DialogTitle>Call Hola</DialogTitle>
             <DialogDescription>Speak naturally. Hola will transcribe your turn and reply in chat.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-5 py-6" aria-live="polite">
-            <div className={listening ? "animate-pulse" : ""}><HolaLogo size={88} /></div>
-            <div className="min-h-12 text-sm text-muted-foreground">{listening ? text || "Listening… your words will appear here." : text || "Ready when you are."}</div>
+            <div className={speaking ? "hola-speaking-glow rounded-full" : "rounded-full"}><HolaLogo size={88} /></div>
+            <div className="min-h-12 text-sm text-muted-foreground">
+              {speaking ? "Hola is speaking…" : listening ? text || "Listening… your words will appear here." : text || "Ready when you are."}
+            </div>
             {listening ? (
               <Button type="button" onClick={() => void stop(true)}><Volume2 className="h-4 w-4 mr-2" />Done speaking</Button>
             ) : (
               <Button type="button" onClick={() => void start()}><Mic className="h-4 w-4 mr-2" />Start speaking</Button>
             )}
-            <Button type="button" variant="ghost" onClick={() => { void stop(false); setOpen(false); }}><PhoneOff className="h-4 w-4 mr-2" />End call</Button>
+            <Button type="button" variant="ghost" onClick={endCall}><PhoneOff className="h-4 w-4 mr-2" />End call</Button>
           </div>
         </DialogContent>
       </Dialog>
