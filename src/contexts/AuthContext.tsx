@@ -17,6 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    (window as any).__holaAuthEffect = Date.now();
     let done = false;
     const finish = () => {
       if (done) return;
