@@ -78,17 +78,31 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const THEME_BOOT_SCRIPT = `(function(){try{var d=document.documentElement;var p={theme:"default",mode:"dark",fontFamily:"sans",fontSize:"medium"};try{var raw=localStorage.getItem("hola.theme.prefs");if(raw){var s=JSON.parse(raw);p.theme=s.theme||p.theme;p.mode=s.mode||p.mode;p.fontFamily=s.fontFamily||p.fontFamily;p.fontSize=s.fontSize||p.fontSize;}}catch(e){}
+d.setAttribute("data-theme",p.theme);d.setAttribute("data-font",p.fontFamily);d.setAttribute("data-font-size",p.fontSize);if(p.mode==="dark"){d.classList.add("dark")}else{d.classList.remove("dark")}}catch(e){}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head><HeadContent /></head>
-      <body>
+    <html
+      lang="en"
+      className="dark"
+      data-theme="default"
+      data-font="sans"
+      data-font-size="medium"
+      suppressHydrationWarning
+    >
+      <head>
+        <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
     </html>
   );
 }
+
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
