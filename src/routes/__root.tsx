@@ -81,6 +81,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const THEME_BOOT_SCRIPT = `(function(){try{var d=document.documentElement;var p={theme:"default",mode:"dark",fontFamily:"sans",fontSize:"medium"};try{var raw=localStorage.getItem("hola.theme.prefs");if(raw){var s=JSON.parse(raw);p.theme=s.theme||p.theme;p.mode=s.mode||p.mode;p.fontFamily=s.fontFamily||p.fontFamily;p.fontSize=s.fontSize||p.fontSize;}}catch(e){}
 d.setAttribute("data-theme",p.theme);d.setAttribute("data-font",p.fontFamily);d.setAttribute("data-font-size",p.fontSize);if(p.mode==="dark"){d.classList.add("dark")}else{d.classList.remove("dark")}}catch(e){}})();`;
 
+const BOOT_BACKGROUND_STYLE = `html,body{margin:0;min-height:100%;background:oklch(0.16 0.025 300);color-scheme:dark}`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html
@@ -92,6 +94,7 @@ function RootShell({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <head>
+        <style dangerouslySetInnerHTML={{ __html: BOOT_BACKGROUND_STYLE }} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
