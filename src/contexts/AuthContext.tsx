@@ -17,12 +17,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
       setLoading(false);
     };
+
+    // Instant hydration: read the cached session from localStorage so the app
+    // never shows a blank loading screen while the network call resolves.
+    try {
+      const key = Object.keys(window.localStorage).find(
+        (k) => k.startsWith("sb-") && k.endsWith("-auth-token"),
+      );
+      if (key) {
+        const raw = window.localStorage.getItem(key);
+        const cached = raw ? JSON.parse(raw) : null;
+        const s = (cached?.currentSession ?? cached) as Session | null;
+        if (s?.access_token) {
+          setSession(s);
+          setUser(s.user ?? null);
+        }
+        finish();
+      } else {
+        // No cached session at all → definitely signed out.
+        finish();
+      }
+    } catch {
+      /* ignore malformed cache */
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
@@ -41,7 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Safety net: never leave the app stuck on a blank loading screen
     // if storage access is blocked (e.g. inside a preview iframe).
-    const t = setTimeout(finish, 4000);
+    const t = setTimeout(finish, 1500);
+
 
     return () => {
       clearTimeout(t);
