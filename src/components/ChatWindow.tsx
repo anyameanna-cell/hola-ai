@@ -497,7 +497,7 @@ function ChatWindowInner({
               }}
               placeholder={temporary ? "Message Hola (temporary)..." : "Message Hola..."}
               rows={1}
-              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-24 pr-14 py-4 text-left placeholder:text-left focus-visible:ring-0 shadow-none overflow-hidden leading-6"
+              className="min-h-[56px] max-h-60 resize-none border-0 bg-transparent pl-36 pr-14 py-4 text-left placeholder:text-left focus-visible:ring-0 shadow-none overflow-hidden leading-6"
               autoFocus
             />
             <input
