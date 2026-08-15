@@ -11,6 +11,32 @@ function detectImagePrompt(text: string): string | null {
   return m ? text.trim() : null;
 }
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Store the PNG in private storage and return a SHORT app URL the model can echo. */
+async function storeImage(b64: string): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const name = `${crypto.randomUUID()}.png`;
+    const { error } = await supabaseAdmin.storage
+      .from("generated-images")
+      .upload(name, b64ToBytes(b64), { contentType: "image/png", upsert: false });
+    if (error) {
+      console.error("[Hola] image upload failed", error.message);
+      return null;
+    }
+    return `/api/img/${name}`;
+  } catch (err) {
+    console.error("[Hola] image upload error", err);
+    return null;
+  }
+}
+
 async function generateImageInline(prompt: string): Promise<string | null> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
@@ -23,8 +49,11 @@ async function generateImageInline(prompt: string): Promise<string | null> {
       if (res.ok) {
         const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
         const first = json.data?.[0];
-        const dataUrl = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : first?.url ?? null;
-        if (dataUrl) return dataUrl;
+        if (first?.b64_json) {
+          const stored = await storeImage(first.b64_json);
+          if (stored) return stored;
+        }
+        if (first?.url) return first.url;
       }
     } catch { /* fallthrough */ }
   }
@@ -46,12 +75,14 @@ async function generateImageInline(prompt: string): Promise<string | null> {
     }
     const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
     const first = json.data?.[0];
-    return first?.b64_json ? `data:image/png;base64,${first.b64_json}` : first?.url ?? null;
+    if (first?.b64_json) return await storeImage(first.b64_json);
+    return first?.url ?? null;
   } catch (err) {
     console.error("[Hola] image gen error", err);
     return null;
   }
 }
+
 
 
 export const Route = createFileRoute("/api/chat")({

@@ -20,6 +20,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AppConnectionsRouteImport } from './routes/_app.connections'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as OauthGoogleReturnRouteImport } from './routes/oauth.google.return'
+import { Route as ApiImgIdRouteImport } from './routes/api/img/$id'
 import { Route as AppCThreadIdRouteImport } from './routes/_app.c.$threadId'
 import { Route as AppAdminInboxRouteImport } from './routes/_app.admin.inbox'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
@@ -78,6 +79,11 @@ const OauthGoogleReturnRoute = OauthGoogleReturnRouteImport.update({
   path: '/oauth/google/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiImgIdRoute = ApiImgIdRouteImport.update({
+  id: '/api/img/$id',
+  path: '/api/img/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppCThreadIdRoute = AppCThreadIdRouteImport.update({
   id: '/c/$threadId',
   path: '/c/$threadId',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/api/tts': typeof ApiTtsRoute
   '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
+  '/api/img/$id': typeof ApiImgIdRoute
   '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/api/tts': typeof ApiTtsRoute
   '/admin/inbox': typeof AppAdminInboxRoute
   '/c/$threadId': typeof AppCThreadIdRoute
+  '/api/img/$id': typeof ApiImgIdRoute
   '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/api/tts': typeof ApiTtsRoute
   '/_app/admin/inbox': typeof AppAdminInboxRoute
   '/_app/c/$threadId': typeof AppCThreadIdRoute
+  '/api/img/$id': typeof ApiImgIdRoute
   '/oauth/google/return': typeof OauthGoogleReturnRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/admin/inbox'
     | '/c/$threadId'
+    | '/api/img/$id'
     | '/oauth/google/return'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/admin/inbox'
     | '/c/$threadId'
+    | '/api/img/$id'
     | '/oauth/google/return'
     | '/api/public/telegram/webhook'
   id:
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/_app/admin/inbox'
     | '/_app/c/$threadId'
+    | '/api/img/$id'
     | '/oauth/google/return'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiImgIdRoute: typeof ApiImgIdRoute
   OauthGoogleReturnRoute: typeof OauthGoogleReturnRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
@@ -283,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthGoogleReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/img/$id': {
+      id: '/api/img/$id'
+      path: '/api/img/$id'
+      fullPath: '/api/img/$id'
+      preLoaderRoute: typeof ApiImgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/c/$threadId': {
       id: '/_app/c/$threadId'
       path: '/c/$threadId'
@@ -332,6 +352,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiImgIdRoute: ApiImgIdRoute,
   OauthGoogleReturnRoute: OauthGoogleReturnRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
