@@ -1,89 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+  type UIMessage,
+} from "ai";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { buildSystemPrompt, type ChatContext } from "@/lib/chat-prompt";
-
-function detectImagePrompt(text: string): string | null {
-  if (!text) return null;
-  const m = text.match(
-    /\b(?:generate|create|draw|make|design|render|paint|produce|show me)\b[^.?!\n]*\b(?:image|picture|photo|photograph|illustration|drawing|artwork|art|painting|sketch|render|wallpaper|poster|logo|icon)\b[^.?!\n]*/i,
-  );
-  return m ? text.trim() : null;
-}
-
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-/** Store the PNG in private storage and return a SHORT app URL the model can echo. */
-async function storeImage(b64: string): Promise<string | null> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const name = `${crypto.randomUUID()}.png`;
-    const { error } = await supabaseAdmin.storage
-      .from("generated-images")
-      .upload(name, b64ToBytes(b64), { contentType: "image/png", upsert: false });
-    if (error) {
-      console.error("[Hola] image upload failed", error.message);
-      return null;
-    }
-    return `/api/img/${name}`;
-  } catch (err) {
-    console.error("[Hola] image upload error", err);
-    return null;
-  }
-}
-
-async function generateImageInline(prompt: string): Promise<string | null> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    try {
-      const res = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
-      });
-      if (res.ok) {
-        const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
-        const first = json.data?.[0];
-        if (first?.b64_json) {
-          const stored = await storeImage(first.b64_json);
-          if (stored) return stored;
-        }
-        if (first?.url) return first.url;
-      }
-    } catch { /* fallthrough */ }
-  }
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  if (!lovableKey) return null;
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-    if (!res.ok) {
-      console.error("[Hola] image gen failed", res.status, (await res.text().catch(() => "")).slice(0, 300));
-      return null;
-    }
-    const json = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
-    const first = json.data?.[0];
-    if (first?.b64_json) return await storeImage(first.b64_json);
-    return first?.url ?? null;
-  } catch (err) {
-    console.error("[Hola] image gen error", err);
-    return null;
-  }
-}
-
-
+import { detectImageRequest, generateImages } from "@/lib/image-gen.server";
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -113,34 +38,66 @@ export const Route = createFileRoute("/api/chat")({
             ?.map((p) => (p.type === "text" ? p.text : ""))
             .join("")
             .trim() ?? "";
-        const imageIntent = detectImagePrompt(lastText);
+
+        const imageReq = detectImageRequest(lastText);
+        let imageUrls: string[] = [];
+        let imageError: string | undefined;
         let imageInjection = "";
-        if (imageIntent) {
-          const url = await generateImageInline(imageIntent);
-          if (url) {
+
+        if (imageReq) {
+          const out = await generateImages(imageReq.prompt, imageReq.count);
+          imageUrls = out.urls;
+          imageError = out.error;
+          if (imageUrls.length) {
             imageInjection =
-              `\n\n## Just-generated image\n` +
-              `An image was already generated for this request. Write your short reply text FIRST, then put this exact markdown on its own new line at the END of your reply (nothing after it):\n\n` +
-              `![generated image](${url})\n`;
+              `\n\n## Just-generated image${imageUrls.length > 1 ? "s" : ""}\n` +
+              `${imageUrls.length} image${imageUrls.length > 1 ? "s were" : " was"} already generated for this request and will be attached automatically right after your reply. ` +
+              `Write ONLY a short, warm caption (1-2 sentences). Do NOT write any markdown image links or URLs yourself — they are appended for you.`;
           } else {
             imageInjection =
-              `\n\n## Image generation\nImage generation failed — apologize briefly and offer to retry with a clearer prompt.`;
+              `\n\n## Image generation failed\nTell the user briefly and kindly: "${imageError}" Offer to try again. Do not write any image markdown.`;
           }
-
         }
 
         const system = buildSystemPrompt(body.context ?? {}) + imageInjection;
-        console.info(`[Hola] Injecting ${(body.context?.memories ?? []).length} global memories for this request.`);
+        console.info(
+          `[Hola] chat request — model=${modelId}, memories=${(body.context?.memories ?? []).length}, images=${imageUrls.length}`,
+        );
 
-        const result = streamText({
-          model: gateway(modelId),
-          system,
-          messages: await convertToModelMessages(msgs),
-        });
-
-        return result.toUIMessageStreamResponse({
+        const stream = createUIMessageStream<UIMessage>({
           originalMessages: msgs,
+          onError: (err) => {
+            console.error("[Hola] chat stream error", err);
+            return "Something went wrong generating that reply. Please try again.";
+          },
+          execute: async ({ writer }) => {
+            const result = streamText({
+              model: gateway(modelId),
+              system,
+              messages: await convertToModelMessages(msgs),
+            });
+            // Hold terminal chunks so the image parts land inside the same message.
+            const tail: Parameters<typeof writer.write>[0][] = [];
+            for await (const chunk of result.toUIMessageStream<UIMessage>()) {
+              if (chunk.type === "finish" || chunk.type === "finish-step") tail.push(chunk);
+              else writer.write(chunk);
+            }
+            if (imageUrls.length) {
+              const md =
+                "\n\n" +
+                imageUrls
+                  .map((u, i) => `![generated image${imageUrls.length > 1 ? ` ${i + 1}` : ""}](${u})`)
+                  .join("\n\n");
+              const id = "hola-images";
+              writer.write({ type: "text-start", id });
+              writer.write({ type: "text-delta", id, delta: md });
+              writer.write({ type: "text-end", id });
+            }
+            for (const chunk of tail) writer.write(chunk);
+          },
         });
+
+        return createUIMessageStreamResponse({ stream });
       },
     },
   },
