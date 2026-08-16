@@ -263,6 +263,7 @@ const CodeBlock = memo(function CodeBlock({ language, code }: { language: string
 function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const download = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
@@ -285,19 +286,27 @@ function ZoomableImage({ src, alt }: { src: string; alt?: string }) {
   return (
     <>
       <span className="relative inline-block my-3 max-w-full">
-        {!loaded && (
+        {!loaded && !failed && (
           <span className="flex items-center justify-center w-full max-w-[520px] aspect-square rounded-lg border bg-card/70">
             <BrushSpinner size={80} label="Loading image" />
-
+          </span>
+        )}
+        {failed && (
+          <span className="flex min-h-40 w-full max-w-[520px] items-center justify-center rounded-lg border bg-card/70 px-6 text-center text-sm text-muted-foreground">
+            The image could not be loaded. Please try generating it again.
           </span>
         )}
         <img
           src={src}
           alt={alt ?? ""}
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
+          loading="eager"
+          onLoad={() => { setLoaded(true); setFailed(false); }}
+          onError={() => setFailed(true)}
           onClick={() => loaded && setOpen(true)}
-          className={"max-w-full rounded-lg border block " + (loaded ? "cursor-zoom-in" : "hidden")}
+          className={loaded
+            ? "block max-w-full cursor-zoom-in rounded-lg border"
+            : "pointer-events-none absolute h-px w-px opacity-0"
+          }
         />
         {loaded && (
           <button

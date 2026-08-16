@@ -15,7 +15,7 @@ export function BrushSpinner({ size = 112, label = "Painting your image" }: { si
       />
       {/* brush riding the stroke while it draws */}
       <g style={{ animation: "hola-brush-fade 2.2s ease-in-out infinite" }}>
-        <g transform="translate(-2.5 -14)">
+        <g transform="translate(-2.5 -14) rotate(-28 2.5 14)">
           <path d="M2.5 22 L0 16 L5 16 Z" fill="currentColor" />
           <rect x="0.4" y="13" width="4.2" height="3" rx="1" fill="currentColor" opacity="0.7" />
           <rect x="1.6" y="4" width="1.8" height="9" rx="0.9" fill="currentColor" opacity="0.45" />
