@@ -76,8 +76,11 @@ export const Route = createFileRoute("/api/chat")({
               system,
               messages: await convertToModelMessages(msgs),
             });
+            // Hold terminal chunks so the image parts land inside the same message.
+            const tail: Parameters<typeof writer.write>[0][] = [];
             for await (const chunk of result.toUIMessageStream<UIMessage>()) {
-              writer.write(chunk);
+              if (chunk.type === "finish" || chunk.type === "finish-step") tail.push(chunk);
+              else writer.write(chunk);
             }
             if (imageUrls.length) {
               const md =
@@ -90,6 +93,7 @@ export const Route = createFileRoute("/api/chat")({
               writer.write({ type: "text-delta", id, delta: md });
               writer.write({ type: "text-end", id });
             }
+            for (const chunk of tail) writer.write(chunk);
           },
         });
 
