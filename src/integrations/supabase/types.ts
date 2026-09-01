@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      code_drafts: {
+        Row: {
+          author_email: string | null
+          content: string
+          created_at: string
+          id: string
+          note: string | null
+          path: string
+          updated_at: string
+        }
+        Insert: {
+          author_email?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          path: string
+          updated_at?: string
+        }
+        Update: {
+          author_email?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contact_messages: {
         Row: {
           body: string
@@ -71,6 +101,24 @@ export type Database = {
           subject?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      manager_staff: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          email: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          email: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          email?: string
         }
         Relationships: []
       }
@@ -133,8 +181,11 @@ export type Database = {
       notifications: {
         Row: {
           body: string
+          body_html: string | null
+          broadcast: boolean
           created_at: string
           id: string
+          image_url: string | null
           read: boolean
           related_contact_id: string | null
           title: string
@@ -142,8 +193,11 @@ export type Database = {
         }
         Insert: {
           body: string
+          body_html?: string | null
+          broadcast?: boolean
           created_at?: string
           id?: string
+          image_url?: string | null
           read?: boolean
           related_contact_id?: string | null
           title: string
@@ -151,8 +205,11 @@ export type Database = {
         }
         Update: {
           body?: string
+          body_html?: string | null
+          broadcast?: boolean
           created_at?: string
           id?: string
+          image_url?: string | null
           read?: boolean
           related_contact_id?: string | null
           title?: string
@@ -327,6 +384,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_manager_staff: { Args: { _email: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
