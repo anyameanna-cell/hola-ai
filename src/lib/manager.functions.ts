@@ -121,15 +121,20 @@ export const managerSendEmail = createServerFn({ method: "POST" })
     if (!data.subject.trim()) throw new Error("Give the email a subject.");
 
     const from = process.env["EMAIL_FROM"];
-    if (!from) {
+    const apiKey = process.env["LOVABLE_API_KEY"];
+    if (!from || !apiKey) {
       throw new Error(
-        "Email sending isn't switched on yet — a sender domain has to be connected to the app first. Ask the owner to set up the email domain, then this will start working.",
+        "Email sending isn't switched on yet — a sender domain has to be connected to the app first. Ask the owner to set up the email domain, then this starts working.",
       );
     }
-    const { sendEmail } = await import("@lovable.dev/email-js");
+    const { sendLovableEmail } = await import("@lovable.dev/email-js");
+    const text = data.html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     let sent = 0;
     for (const to of data.to) {
-      await sendEmail({ from, to, subject: data.subject, html: data.html });
+      await sendLovableEmail(
+        { from, to, subject: data.subject, html: data.html, text },
+        { apiKey },
+      );
       sent++;
     }
     return { ok: true as const, sent };
