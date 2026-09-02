@@ -249,7 +249,17 @@ function SettingsContent() {
           </div>
         </section>
 
+        <section className="space-y-2">
+          <Label>Staff</Label>
+          <Button variant="outline" className="w-full justify-start" onClick={() => setManagerOpen(true)}>
+            <ShieldCheck className="h-4 w-4 mr-2" /> Hola Manager
+          </Button>
+          <p className="text-xs text-muted-foreground">Staff-only console. Sign in with your staff email and passcode.</p>
+        </section>
+        <ManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
+
         <section className="space-y-3 rounded-lg border p-3">
+
           <Label>Read aloud voice</Label>
           <div className="grid grid-cols-1 gap-1.5">
             {VOICES.map((v) => (
