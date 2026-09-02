@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Settings, Sun, Moon } from "lucide-react";
+import { Settings, Sun, Moon, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { ManagerDialog } from "@/components/manager/ManagerDialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -94,6 +95,7 @@ function SettingsContent() {
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [managerOpen, setManagerOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
