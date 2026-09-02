@@ -139,3 +139,57 @@ export const managerSendEmail = createServerFn({ method: "POST" })
     }
     return { ok: true as const, sent };
   });
+
+/** Saved code drafts (the Code tab). */
+export const managerListDrafts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: Passcoded) => d)
+  .handler(async ({ data, context }) => {
+    const { assertManager } = await import("@/lib/manager.server");
+    await assertManager(email(context), data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("code_drafts")
+      .select("id, path, content, note, author_email, updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const managerSaveDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: Passcoded & { id?: string; path: string; content: string; note?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { assertManager } = await import("@/lib/manager.server");
+    const mail = email(context);
+    await assertManager(mail, data.passcode);
+    if (!data.path.trim()) throw new Error("Give the file a path.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const row = {
+      ...(data.id ? { id: data.id } : {}),
+      path: data.path.trim(),
+      content: data.content,
+      note: data.note ?? null,
+      author_email: mail ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    const { data: saved, error } = await supabaseAdmin
+      .from("code_drafts")
+      .upsert(row)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true as const, id: saved.id };
+  });
+
+export const managerDeleteDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: Passcoded & { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { assertManager } = await import("@/lib/manager.server");
+    await assertManager(email(context), data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("code_drafts").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
