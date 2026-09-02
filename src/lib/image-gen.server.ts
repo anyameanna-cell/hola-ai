@@ -127,7 +127,7 @@ async function callGateway(prompt: string): Promise<{ b64?: string; url?: string
       method: "POST",
       headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image",
+        model: "google/gemini-3-pro-image",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -136,7 +136,7 @@ async function callGateway(prompt: string): Promise<{ b64?: string; url?: string
       const body = (await res.text().catch(() => "")).slice(0, 500);
       console.error(`[Hola:image] gateway ${res.status} after ${Date.now() - started}ms: ${body}`);
       if (res.status === 429) return { error: "Image generation is rate-limited right now. Try again in a moment." };
-      if (res.status === 402) return { error: "The image generation credits for this workspace have run out." };
+      if (res.status === 402) return { error: "The image service is busy right now. Please try again in a little while." };
       if (/content|policy|moderat/i.test(body)) return { error: "That image prompt was rejected by the safety filter. Try describing it differently." };
       return { error: "The image service returned an error. Please try again." };
     }

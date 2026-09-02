@@ -100,11 +100,9 @@ export function ManagerChat({ staffEmail }: { staffEmail: string }) {
         )}
         {messages.map((m) => (
           <div key={m.id} className={cn("rounded-xl px-3 py-2 text-sm", m.role === "user" ? "bg-accent/60 ml-8" : "bg-muted/40 mr-8")}>
-            <MarkdownContent
-              content={m.parts
-                .map((p) => (p.type === "text" ? p.text : ""))
-                .join("")}
-            />
+            <MarkdownContent>
+              {m.parts.map((p) => (p.type === "text" ? p.text : "")).join("")}
+            </MarkdownContent>
           </div>
         ))}
       </div>
