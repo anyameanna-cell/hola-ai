@@ -196,7 +196,7 @@ export async function generateImages(
       const name = `${await sha256Hex(variantPrompt)}.png`;
       const cached = await findCached(name);
       if (cached) return { url: cached };
-      const out = await callGateway(variantPrompt);
+      const out = await callGateway(buildImagePrompt(variantPrompt));
       if (out.b64) {
         const stored = await storeImage(name, out.b64);
         if (stored) return { url: stored };
