@@ -118,7 +118,36 @@ export async function cleanupOldImages(): Promise<void> {
   }
 }
 
+/** Pull out wording the user wants rendered verbatim on the image. */
+export function extractImageText(prompt: string): string[] {
+  const out: string[] = [];
+  const quoted = prompt.matchAll(/["“”'‘’]([^"“”'‘’]{1,120})["“”'‘’]/g);
+  for (const m of quoted) {
+    const t = m[1]!.trim();
+    if (t) out.push(t);
+  }
+  if (!out.length) {
+    const said = prompt.match(/\b(?:that says|saying|with the (?:text|words|caption|title)|text reads?|write)\s*:?\s*(.{1,120})$/i);
+    if (said) out.push(said[1]!.trim().replace(/[.!]+$/, ""));
+  }
+  return [...new Set(out)].slice(0, 3);
+}
+
+/** Add verbatim-typography instructions when the user asked for text on the image. */
+export function buildImagePrompt(prompt: string): string {
+  const texts = extractImageText(prompt);
+  if (!texts.length) return prompt;
+  const list = texts.map((t) => `"${t}"`).join(", ");
+  return (
+    `${prompt}\n\nTypography requirements: render the following text ON the image exactly as written, ` +
+    `character for character, with correct spelling and no extra or missing words: ${list}. ` +
+    `Use large, crisp, well-kerned lettering with strong contrast against the background so it is fully legible, ` +
+    `keep all text inside the frame, and do not add any other words, watermarks, or gibberish lettering.`
+  );
+}
+
 async function callGateway(prompt: string): Promise<{ b64?: string; url?: string; error?: string }> {
+
   const lovableKey = process.env.LOVABLE_API_KEY;
   if (!lovableKey) return { error: "No image provider is configured on the server." };
   const started = Date.now();
@@ -167,7 +196,7 @@ export async function generateImages(
       const name = `${await sha256Hex(variantPrompt)}.png`;
       const cached = await findCached(name);
       if (cached) return { url: cached };
-      const out = await callGateway(variantPrompt);
+      const out = await callGateway(buildImagePrompt(variantPrompt));
       if (out.b64) {
         const stored = await storeImage(name, out.b64);
         if (stored) return { url: stored };

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, Lock, Plus, Save, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, ImagePlus, Lock, Plus, Save, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   managerSaveDraft,
   managerSendEmail,
   managerSignIn,
+  managerUploadImage,
 } from "@/lib/manager.functions";
 import { toast } from "sonner";
 
@@ -267,12 +268,49 @@ function CodeTab({ passcode }: { passcode: string }) {
 
 function NotifyTab({ passcode }: { passcode: string }) {
   const publish = useServerFn(managerPublishNotification);
+  const upload = useServerFn(managerUploadImage);
   const [title, setTitle] = useState("");
   const [html, setHtml] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const wrap = (tag: string) => setHtml((h) => `${h}<${tag}>text</${tag}>`);
+
+  const uploadFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Only images can be attached.");
+        return;
+      }
+      setUploading(true);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not read that file."));
+          reader.readAsDataURL(file);
+        });
+        const res = await upload({ data: { passcode, dataUrl } });
+        setImageUrl(res.url);
+        toast.success("Image attached");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [passcode, upload],
+  );
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData.files)[0];
+    if (file) {
+      e.preventDefault();
+      void uploadFile(file);
+    }
+  };
 
   const send = async () => {
     setBusy(true);
@@ -292,7 +330,7 @@ function NotifyTab({ passcode }: { passcode: string }) {
   };
 
   return (
-    <div className="space-y-3 p-1">
+    <div className="space-y-3 p-1" onPaste={onPaste}>
       <Label>Title</Label>
       <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What's new in Hola" />
       <div className="flex flex-wrap gap-1.5">
@@ -308,12 +346,48 @@ function NotifyTab({ passcode }: { passcode: string }) {
         className="min-h-[160px] font-mono text-xs"
         placeholder="<b>Hola just got better</b> — new voices and faster images."
       />
-      <Label>Image URL (optional)</Label>
-      <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
+
+      <Label>Image (optional)</Label>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadFile(f);
+            e.target.value = "";
+          }}
+        />
+        <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          <ImagePlus className="mr-1 h-4 w-4" />
+          {uploading ? "Uploading…" : imageUrl ? "Replace image" : "Upload image"}
+        </Button>
+        {imageUrl ? (
+          <Button size="sm" variant="ghost" onClick={() => setImageUrl("")}>
+            <X className="mr-1 h-4 w-4" /> Remove
+          </Button>
+        ) : null}
+        <span className="text-xs text-muted-foreground">or paste an image anywhere in this tab</span>
+      </div>
+      <Input
+        value={imageUrl}
+        onChange={(e) => setImageUrl(e.target.value)}
+        placeholder="…or paste an image URL"
+      />
+
       <div className="rounded-lg border p-3">
         <p className="mb-1 text-xs text-muted-foreground">Preview</p>
         <p className="text-sm font-medium">{title || "Untitled"}</p>
         <div className="prose-chat text-sm" dangerouslySetInnerHTML={{ __html: html }} />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt="Notification attachment preview"
+            className="mt-2 max-h-56 w-auto rounded-md border object-contain"
+          />
+        ) : null}
       </div>
       <Button disabled={busy || !title.trim() || !html.trim()} onClick={() => void send()}>
         <Send className="mr-1 h-4 w-4" /> Publish to everyone
@@ -321,6 +395,7 @@ function NotifyTab({ passcode }: { passcode: string }) {
     </div>
   );
 }
+
 
 function EmailTab({ passcode }: { passcode: string }) {
   const listEmails = useServerFn(managerListUserEmails);

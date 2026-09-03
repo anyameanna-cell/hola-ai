@@ -193,3 +193,30 @@ export const managerDeleteDraft = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });
+
+/** Upload an image (base64 data URL) for a notification; returns an app-served URL. */
+export const managerUploadImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: Passcoded & { dataUrl: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { assertManager } = await import("@/lib/manager.server");
+    await assertManager(email(context), data.passcode);
+
+    const match = /^data:image\/[a-zA-Z+]+;base64,(.+)$/.exec(data.dataUrl.trim());
+    if (!match) throw new Error("That file doesn't look like an image.");
+    const b64 = match[1]!;
+    const bin = atob(b64);
+    if (bin.length > 8 * 1024 * 1024) throw new Error("That image is larger than 8MB.");
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const name = `${[...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")}.png`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.storage
+      .from("generated-images")
+      .upload(name, bytes, { contentType: "image/png", upsert: true });
+    if (error) throw new Error(error.message);
+    return { ok: true as const, url: `/api/img/${name}` };
+  });
