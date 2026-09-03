@@ -132,136 +132,147 @@ function SettingsContent() {
     <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Settings</DialogTitle>
-        <DialogDescription>Profile and appearance.</DialogDescription>
+        <DialogDescription>Profile, appearance, chat and voice.</DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-5 mt-2">
-        <section className="space-y-2">
-          <Label htmlFor="display-name">Display name</Label>
-          <div className="flex gap-2">
-            <Input
-              id="display-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              maxLength={60}
-            />
-            <Button onClick={saveName} disabled={saving || name.trim() === savedName || !name.trim()}>
-              Save
-            </Button>
-          </div>
-        </section>
+      <Tabs defaultValue="profile" className="mt-2">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="appearance">Look</TabsTrigger>
+          <TabsTrigger value="chat">Chat</TabsTrigger>
+          <TabsTrigger value="voice">Voice</TabsTrigger>
+        </TabsList>
 
-        <section className="space-y-2">
-          <Label>Color theme</Label>
-          <div className="grid grid-cols-4 gap-2">
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTheme(t.id)}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 transition",
-                  theme === t.id ? "border-primary" : "border-transparent hover:border-border",
-                )}
-              >
-                <div
-                  className="h-12 w-12 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow"
-                  style={{ background: t.gradient }}
-                >
-                  H
-                </div>
-                <span className="text-xs">{t.label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <Label>Mode</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant={mode === "light" ? "default" : "outline"} onClick={() => setMode("light")}>
-              <Sun className="h-4 w-4 mr-1" /> Light
-            </Button>
-            <Button variant={mode === "dark" ? "default" : "outline"} onClick={() => setMode("dark")}>
-              <Moon className="h-4 w-4 mr-1" /> Dark
-            </Button>
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <Label>Font family</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {FONTS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFontFamily(f.id)}
-                className={cn(
-                  "rounded-lg border-2 px-3 py-3 transition",
-                  fontFamily === f.id ? "border-primary" : "border-border hover:border-muted-foreground/40",
-                )}
-                style={{ fontFamily: f.id === "serif" ? "Georgia, serif" : f.id === "mono" ? "monospace" : "system-ui" }}
-              >
-                <div className="text-xl font-bold">{f.sample}</div>
-                <div className="text-xs text-muted-foreground mt-1">{f.label}</div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <Label>Text size</Label>
-          <div className="grid grid-cols-4 gap-2">
-            {SIZES.map((s) => (
-              <Button key={s.id} variant={fontSize === s.id ? "default" : "outline"} size="sm" onClick={() => setFontSize(s.id)}>
-                {s.label}
+        <TabsContent value="profile" className="space-y-5">
+          <section className="space-y-2">
+            <Label htmlFor="display-name">Display name</Label>
+            <div className="flex gap-2">
+              <Input
+                id="display-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                maxLength={60}
+              />
+              <Button onClick={saveName} disabled={saving || name.trim() === savedName || !name.trim()}>
+                Save
               </Button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="ai-rename">Let Hola rename chats</Label>
-              <p className="text-xs text-muted-foreground">Hola can update conversation titles as the topic evolves.</p>
             </div>
-            <Switch id="ai-rename" checked={aiCanRename} onCheckedChange={setAiCanRename} />
-          </div>
-        </section>
+          </section>
 
-        <section className="space-y-2">
-          <Label>Message length</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {LENGTHS.map((l) => (
-              <Button key={l.id} variant={messageLength === l.id ? "default" : "outline"} size="sm" onClick={() => setMessageLength(l.id)}>
-                {l.label}
+          <section className="space-y-2">
+            <Label>Staff</Label>
+            <Button variant="outline" className="w-full justify-start" onClick={() => setManagerOpen(true)}>
+              <ShieldCheck className="h-4 w-4 mr-2" /> Hola Manager
+            </Button>
+            <p className="text-xs text-muted-foreground">Staff-only console. Sign in with your staff email and passcode.</p>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="appearance" className="space-y-5">
+          <section className="space-y-2">
+            <Label>Color theme</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 transition",
+                    theme === t.id ? "border-primary" : "border-transparent hover:border-border",
+                  )}
+                >
+                  <div
+                    className="h-12 w-12 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow"
+                    style={{ background: t.gradient }}
+                  >
+                    H
+                  </div>
+                  <span className="text-xs">{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <Label>Mode</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant={mode === "light" ? "default" : "outline"} onClick={() => setMode("light")}>
+                <Sun className="h-4 w-4 mr-1" /> Light
               </Button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <Label>Behavior</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {BEHAVIORS.map((b) => (
-              <Button key={b.id} variant={behavior === b.id ? "default" : "outline"} size="sm" onClick={() => setBehavior(b.id)}>
-                {b.label}
+              <Button variant={mode === "dark" ? "default" : "outline"} onClick={() => setMode("dark")}>
+                <Moon className="h-4 w-4 mr-1" /> Dark
               </Button>
-            ))}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="space-y-2">
-          <Label>Staff</Label>
-          <Button variant="outline" className="w-full justify-start" onClick={() => setManagerOpen(true)}>
-            <ShieldCheck className="h-4 w-4 mr-2" /> Hola Manager
-          </Button>
-          <p className="text-xs text-muted-foreground">Staff-only console. Sign in with your staff email and passcode.</p>
-        </section>
-        <ManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
+          <section className="space-y-2">
+            <Label>Font family</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {FONTS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFontFamily(f.id)}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-3 transition",
+                    fontFamily === f.id ? "border-primary" : "border-border hover:border-muted-foreground/40",
+                  )}
+                  style={{ fontFamily: f.id === "serif" ? "Georgia, serif" : f.id === "mono" ? "monospace" : "system-ui" }}
+                >
+                  <div className="text-xl font-bold">{f.sample}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{f.label}</div>
+                </button>
+              ))}
+            </div>
+          </section>
 
-        <section className="space-y-3 rounded-lg border p-3">
+          <section className="space-y-2">
+            <Label>Text size</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {SIZES.map((s) => (
+                <Button key={s.id} variant={fontSize === s.id ? "default" : "outline"} size="sm" onClick={() => setFontSize(s.id)}>
+                  {s.label}
+                </Button>
+              ))}
+            </div>
+          </section>
+        </TabsContent>
 
+        <TabsContent value="chat" className="space-y-5">
+          <section className="space-y-2">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="ai-rename">Let Hola rename chats</Label>
+                <p className="text-xs text-muted-foreground">Hola can update conversation titles as the topic evolves.</p>
+              </div>
+              <Switch id="ai-rename" checked={aiCanRename} onCheckedChange={setAiCanRename} />
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <Label>Message length</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {LENGTHS.map((l) => (
+                <Button key={l.id} variant={messageLength === l.id ? "default" : "outline"} size="sm" onClick={() => setMessageLength(l.id)}>
+                  {l.label}
+                </Button>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <Label>Behavior</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {BEHAVIORS.map((b) => (
+                <Button key={b.id} variant={behavior === b.id ? "default" : "outline"} size="sm" onClick={() => setBehavior(b.id)}>
+                  {b.label}
+                </Button>
+              ))}
+            </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="voice" className="space-y-3">
           <Label>Read aloud voice</Label>
           <div className="grid grid-cols-1 gap-1.5">
             {VOICES.map((v) => (
@@ -290,8 +301,11 @@ function SettingsContent() {
             </div>
             <Slider min={0} max={1} step={0.05} value={[ttsVolume]} onValueChange={([v]) => setTtsVolume(v)} />
           </div>
-        </section>
-      </div>
+        </TabsContent>
+      </Tabs>
+
+      <ManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
     </DialogContent>
   );
 }
+
