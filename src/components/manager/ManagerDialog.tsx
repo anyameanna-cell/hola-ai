@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, Lock, Plus, Save, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, ImagePlus, Lock, Plus, Save, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   managerSaveDraft,
   managerSendEmail,
   managerSignIn,
+  managerUploadImage,
 } from "@/lib/manager.functions";
 import { toast } from "sonner";
 
