@@ -68,6 +68,11 @@ export const Route = createFileRoute("/api/chat")({
           originalMessages: msgs,
           onError: (err) => {
             console.error("[Hola] chat stream error", err);
+            const msg = err instanceof Error ? err.message : String(err ?? "");
+            // Hola is free — translate upstream billing/402 errors into friendly copy.
+            if (/payment required|402|insufficient.?credits?/i.test(msg)) {
+              return "Hola is a little busy right now — please try again in a moment.";
+            }
             return "Something went wrong generating that reply. Please try again.";
           },
           execute: async ({ writer }) => {
