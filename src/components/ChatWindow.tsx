@@ -237,7 +237,15 @@ function ChatWindowInner({
     id: threadId,
     messages: initialMessages,
     transport,
-    onError: (e) => toast.error(e.message ?? "Something went wrong"),
+    onError: (e) => {
+      const msg = e.message ?? "";
+      // Hola is free — never surface raw billing/402 language to users.
+      if (/payment required|402|insufficient.?credits?/i.test(msg)) {
+        toast.error("Hola is a little busy right now — please try again in a moment.");
+      } else {
+        toast.error(msg || "Something went wrong");
+      }
+    },
   });
 
   const isBusy = status === "streaming" || status === "submitted";
