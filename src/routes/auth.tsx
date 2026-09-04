@@ -33,6 +33,24 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // The sign-in / sign-up screen always uses the default look, regardless of saved prefs.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prev = {
+      theme: root.getAttribute("data-theme"),
+      font: root.getAttribute("data-font"),
+      size: root.getAttribute("data-font-size"),
+    };
+    root.setAttribute("data-theme", "default");
+    root.setAttribute("data-font", "sans");
+    root.setAttribute("data-font-size", "medium");
+    return () => {
+      if (prev.theme) root.setAttribute("data-theme", prev.theme); else root.removeAttribute("data-theme");
+      if (prev.font) root.setAttribute("data-font", prev.font); else root.removeAttribute("data-font");
+      if (prev.size) root.setAttribute("data-font-size", prev.size); else root.removeAttribute("data-font-size");
+    };
+  }, []);
+
   useEffect(() => {
     if (!loading && user) navigate({ to: "/chat", replace: true });
   }, [user, loading, navigate]);
