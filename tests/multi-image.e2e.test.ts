@@ -54,7 +54,8 @@ describe("multi-image generation, end to end", () => {
     const req = detectImageRequest(PROMPT);
     expect(req).not.toBeNull();
 
-    const urls = await generateImages(req!.prompt, req!.count);
+    const { urls, error } = await generateImages(req!.prompt, req!.count);
+    expect(error, `image service error: ${error}`).toBeUndefined();
     expect(urls.length).toBe(req!.count);
 
     // 1. distinct
