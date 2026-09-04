@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Copy, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { BrushSpinner } from "@/components/BrushSpinner";
 import mermaid from "mermaid";
+import { ChoiceBlock } from "@/components/ChoiceBlock";
 
 // Init mermaid exactly once for the page
 let mermaidInit = false;
@@ -371,6 +372,7 @@ export function MarkdownContent({ children, streaming }: { children: string; str
               );
             }
             if (lang === "mermaid") return <MermaidBlock code={code} streaming={streaming} />;
+            if (lang === "choices") return <ChoiceBlock code={code} streaming={streaming} />;
             return <CodeBlock language={lang} code={code} />;
           },
         }}

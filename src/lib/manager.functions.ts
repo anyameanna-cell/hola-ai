@@ -220,3 +220,11 @@ export const managerUploadImage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true as const, url: `/api/img/${name}` };
   });
+
+/** Is the signed-in account on the staff allowlist? No passcode needed — visibility only. */
+export const managerAmIStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { isStaffEmail } = await import("@/lib/manager.server");
+    return { staff: await isStaffEmail(email(context)) };
+  });

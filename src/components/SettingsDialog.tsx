@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Settings, Sun, Moon, ShieldCheck } from "lucide-react";
 import {
   Dialog,
@@ -26,6 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ManagerDialog } from "@/components/manager/ManagerDialog";
+import { managerAmIStaff } from "@/lib/manager.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -97,6 +99,15 @@ function SettingsContent() {
   const [savedName, setSavedName] = useState("");
   const [saving, setSaving] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const checkStaff = useServerFn(managerAmIStaff);
+  useEffect(() => {
+    let cancelled = false;
+    checkStaff({ data: undefined })
+      .then((r) => { if (!cancelled) setIsStaff(Boolean(r?.staff)); })
+      .catch(() => { if (!cancelled) setIsStaff(false); });
+    return () => { cancelled = true; };
+  }, [checkStaff]);
 
   useEffect(() => {
     if (!user) return;
@@ -161,6 +172,7 @@ function SettingsContent() {
             </div>
           </section>
 
+          {isStaff && (
           <section className="space-y-2">
             <Label>Staff</Label>
             <Button variant="outline" className="w-full justify-start" onClick={() => setManagerOpen(true)}>
@@ -168,6 +180,7 @@ function SettingsContent() {
             </Button>
             <p className="text-xs text-muted-foreground">Staff-only console. Sign in with your staff email and passcode.</p>
           </section>
+          )}
         </TabsContent>
 
         <TabsContent value="appearance" className="space-y-5">

@@ -12,6 +12,7 @@ import { HolaLoader } from "@/components/HolaLoader";
 import { CallMode } from "@/components/CallMode";
 import { BrushSpinner } from "@/components/BrushSpinner";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { CHOICE_SUBMIT_EVENT } from "@/components/ChoiceBlock";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { generateThreadTitle } from "@/lib/title.functions";
@@ -423,6 +424,20 @@ function ChatWindowInner({
       await sendMessage({ text }, { body });
     }
   };
+
+  const sendRef = useRef(sendUserText);
+  sendRef.current = sendUserText;
+
+  // Choice blocks in assistant messages dispatch this event when submitted.
+  useEffect(() => {
+    const onChoice = (e: Event) => {
+      const detail = (e as CustomEvent<{ text?: string }>).detail;
+      const text = detail?.text?.trim();
+      if (text) void sendRef.current(text, []);
+    };
+    window.addEventListener(CHOICE_SUBMIT_EVENT, onChoice as EventListener);
+    return () => window.removeEventListener(CHOICE_SUBMIT_EVENT, onChoice as EventListener);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
