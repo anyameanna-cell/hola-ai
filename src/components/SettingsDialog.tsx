@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Settings, Sun, Moon, ShieldCheck } from "lucide-react";
 import {
   Dialog,
