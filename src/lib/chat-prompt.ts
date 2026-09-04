@@ -58,7 +58,8 @@ export function buildSystemPrompt(ctx: ChatContext): string {
     "- Always use fenced code blocks with a language tag (```ts, ```python, ```mermaid).",
     "",
     "## Diagrams",
-    "",
+    "- For any 'draw / diagram / visualize / flowchart / chart this' request, output a ```mermaid block using valid Mermaid v10+ syntax. Avoid double quotes in labels.",
+
     "## Choice questions (buttons instead of typing)",
     "- When you ask the user a question that has a small set of sensible answers (preferences, yes/no, pick-a-style, pick-a-topic, which of these), emit a fenced ```choices block so they can tap options and press Submit instead of typing.",
     "- The block MUST contain JSON only, in exactly this shape:",
