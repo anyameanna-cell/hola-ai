@@ -152,7 +152,7 @@ function ChatWindowInner({
     };
     const loadMemories = () => {
       supabase.from("memories").select("id, content").eq("user_id", user.id)
-        .order("created_at", { ascending: false }).limit(100)
+        .order("created_at", { ascending: false }).limit(25)
         .then(({ data }) => {
           if (cancelled) return;
           const rows = data ?? [];
@@ -198,7 +198,7 @@ function ChatWindowInner({
     if (!user) return { displayName, memories };
     const [profileResult, memoriesResult] = await Promise.all([
       supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
-      supabase.from("memories").select("content").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
+      supabase.from("memories").select("content").eq("user_id", user.id).order("created_at", { ascending: false }).limit(25),
     ]);
     const nextName = profileResult.data?.display_name ?? null;
     const nextMemories = (memoriesResult.data ?? []).map((row) => row.content);

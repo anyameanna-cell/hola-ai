@@ -31,7 +31,23 @@ export const Route = createFileRoute("/api/chat")({
             ? body.model
             : "google/gemini-3-flash-preview";
 
-        const msgs = body.messages as UIMessage[];
+        // Cost control: cap history to the last 12 messages, strip file parts
+        // from everything except the latest user message (re-sending old
+        // images/files on every turn is the biggest token cost), and truncate
+        // very long text parts.
+        const allMsgs = body.messages as UIMessage[];
+        const msgs = allMsgs.slice(-12);
+        const lastUserIdx = msgs.reduce((acc, m, i) => (m.role === "user" ? i : acc), -1);
+        const trimmed = msgs.map((m, i) => ({
+          ...m,
+          parts: (m.parts ?? [])
+            .filter((p) => p.type !== "file" || i === lastUserIdx)
+            .map((p) =>
+              p.type === "text" && p.text.length > 4000
+                ? { ...p, text: p.text.slice(0, 4000) + "…" }
+                : p,
+            ),
+        })) as UIMessage[];
         const lastUser = [...msgs].reverse().find((m) => m.role === "user");
         const lastText =
           lastUser?.parts
@@ -65,7 +81,7 @@ export const Route = createFileRoute("/api/chat")({
         );
 
         const stream = createUIMessageStream<UIMessage>({
-          originalMessages: msgs,
+          originalMessages: trimmed,
           onError: (err) => {
             console.error("[Hola] chat stream error", err);
             const msg = err instanceof Error ? err.message : String(err ?? "");
@@ -79,7 +95,7 @@ export const Route = createFileRoute("/api/chat")({
             const result = streamText({
               model: gateway(modelId),
               system,
-              messages: await convertToModelMessages(msgs),
+              messages: await convertToModelMessages(trimmed),
             });
             // Hold terminal chunks so the image parts land inside the same message.
             const tail: Parameters<typeof writer.write>[0][] = [];
