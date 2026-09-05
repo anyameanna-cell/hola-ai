@@ -81,7 +81,7 @@ export const Route = createFileRoute("/api/chat")({
         );
 
         const stream = createUIMessageStream<UIMessage>({
-          originalMessages: msgs,
+          originalMessages: trimmed,
           onError: (err) => {
             console.error("[Hola] chat stream error", err);
             const msg = err instanceof Error ? err.message : String(err ?? "");
@@ -95,7 +95,7 @@ export const Route = createFileRoute("/api/chat")({
             const result = streamText({
               model: gateway(modelId),
               system,
-              messages: await convertToModelMessages(msgs),
+              messages: await convertToModelMessages(trimmed),
             });
             // Hold terminal chunks so the image parts land inside the same message.
             const tail: Parameters<typeof writer.write>[0][] = [];

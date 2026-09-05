@@ -100,12 +100,13 @@ export function buildSystemPrompt(ctx: ChatContext): string {
   }
   if (ctx.memories?.length) {
     lines.push("", "## Long-term memories about this user");
-    for (const memory of ctx.memories.slice(0, 60)) lines.push(`- ${memory}`);
+    // Cost control: 25 most recent memories, each capped at 140 chars.
+    for (const memory of ctx.memories.slice(0, 25)) lines.push(`- ${memory.slice(0, 140)}`);
   }
   if (ctx.recentChats?.length) {
     lines.push("", "## Recent past conversations (for continuity)");
-    for (const chat of ctx.recentChats.slice(0, 8)) {
-      lines.push(`- \"${chat.title}\"${chat.snippet ? ` — ${chat.snippet}` : ""}`);
+    for (const chat of ctx.recentChats.slice(0, 5)) {
+      lines.push(`- \"${chat.title.slice(0, 60)}\"${chat.snippet ? ` — ${chat.snippet.slice(0, 80)}` : ""}`);
     }
   }
   lines.push("", "Match the user's language naturally.");
