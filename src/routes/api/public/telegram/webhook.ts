@@ -175,7 +175,7 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
           } else {
             const gateway = createLovableAiGatewayProvider(lovableKey);
             const result = await generateText({
-              model: gateway("google/gemini-3.1-flash-lite"),
+              model: gateway("google/gemini-3-flash-preview"),
               system:
                 "You are Hola, a warm, concise AI assistant replying in Telegram. Match the user's language. Use simple Markdown-safe text and occasional natural emojis. If the user asks about their email or spreadsheets, tell them to use /gmail or /sheet.",
               prompt: message.text,
