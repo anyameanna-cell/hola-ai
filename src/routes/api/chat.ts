@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/chat")({
         const modelId =
           typeof body.model === "string" && body.model
             ? body.model
-            : "google/gemini-3-flash-preview";
+            : "google/gemini-3.1-flash-lite";
 
         // Cost control: cap history to the last 12 messages, strip file parts
         // from everything except the latest user message (re-sending old
