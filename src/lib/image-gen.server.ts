@@ -4,7 +4,7 @@
  */
 
 const BUCKET = "generated-images";
-const MAX_IMAGES = 2;
+const MAX_IMAGES = 4;
 const RETENTION_DAYS = 30;
 const MAX_FILES = 500;
 
@@ -32,7 +32,7 @@ export function detectImageRequest(text: string): ImageRequest | null {
   else {
     const word = t.match(/\b(one|two|three|four|couple|few)\s+(?:of\s+)?(?:different\s+|separate\s+|unique\s+)?(?:image|picture|photo|illustration|drawing|artwork|painting|render|variation|version)s?\b/i);
     if (word) count = NUMBER_WORDS[word[1]!.toLowerCase()] ?? 1;
-    else if (/\b(images|pictures|pics|photos|illustrations|drawings|paintings|variations|versions)\b/i.test(t)) count = 1;
+    else if (/\b(images|pictures|pics|photos|illustrations|drawings|paintings|variations|versions)\b/i.test(t)) count = 2;
   }
   return { prompt: t, count: Math.min(Math.max(count, 1), MAX_IMAGES) };
 }
@@ -156,7 +156,7 @@ async function callGateway(prompt: string): Promise<{ b64?: string; url?: string
       method: "POST",
       headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-lite-image",
+        model: "google/gemini-3-pro-image",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
